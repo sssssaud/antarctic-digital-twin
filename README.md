@@ -168,12 +168,24 @@ forwards rejected promises to the error handler on its own. `npm audit` reports 
 `presentation/deck.html` is the 8-slide pitch deck, following the SIH idea-submission
 sections (problem, solution, technical approach, prototype, feasibility, impact, references).
 
-Open it in any browser — arrow keys move between slides. It is a single self-contained file:
-the dashboard screenshots are embedded, nothing is fetched from a CDN, so it works with no
-internet at all. `Ctrl+P` exports it to PDF (tick **Background graphics**).
+Open it in any browser. Arrow keys, `Space`, `Page Up/Down`, `Home` and `End` move between
+slides; the current slide is written to the URL hash, so a link can point at one slide.
+
+It is a single self-contained file, 343 KB. The two dashboard screenshots and all six font
+faces (Plus Jakarta Sans, JetBrains Mono, subsetted to the glyphs actually used) are embedded
+as base64 — nothing is fetched from a CDN or Google Fonts, so it renders identically on a
+machine with no internet. `Ctrl+P` exports it to PDF at 1280x720 per page (tick
+**Background graphics**); the entry animations are disabled for print and for anyone with
+`prefers-reduced-motion` set.
 
 The screenshots are also kept unembedded in `presentation/assets/` for use in submission forms.
-If you replace them there, re-embed them into the deck — the HTML carries its own copy.
+
+**To edit the deck, edit `presentation/src/deck.src.html`, not `deck.html`.** The latter is
+generated — it holds the base64 payloads. Rebuild with:
+
+```bash
+python3 presentation/src/build.py
+```
 
 ## Honest limitations
 

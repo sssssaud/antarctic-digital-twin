@@ -47,12 +47,27 @@ Beyond the prompt's minimum:
 ## Presentation
 
 `presentation/deck.html`, 8 slides on the SIH idea-submission sections. Single self-contained
-file — screenshots base64-embedded, no CDN, works offline. Arrow keys navigate, Ctrl+P exports
-PDF with Background graphics enabled.
+file, 343 KB — screenshots and six subsetted font faces base64-embedded, no CDN, works offline.
+Arrow keys navigate, Ctrl+P exports PDF at 1280x720 per page with Background graphics enabled.
 
-Verified: all 8 slides measured at zero overflow in both axes, both embedded images decode.
-Chrome's screenshot capture kept timing out on this page, so layout was checked by measuring
-the DOM rather than by eye.
+**Rebuilt from scratch** against the installed design skills (`design-taste-frontend`,
+`high-end-visual-design`). The first version was generic: system fonts, 1px gray borders,
+symmetric equal-column grids, no motion. The rebuild uses Double-Bezel nested cards (outer
+shell + inner core, concentric radii), asymmetric grids on every slide, macro-whitespace,
+a staggered rise on slide entry with a custom `cubic-bezier(.32,.72,0,1)`, and `font-mono`
+for every number. Source of truth for edits is `deck.src.html` in the build dir plus
+`inject.py`, which base64-injects the fonts and images.
+
+Verified by measuring the DOM, not by eye: all 8 slides report zero spill past the slide rect
+in both axes and zero clipping on any element that can clip. Each slide was also screenshotted
+and inspected.
+
+Two layout bugs the measurement caught that screenshots alone would have missed:
+- `.slide.on{display:flex}` (specificity 0,2,0) was overriding `.cover{display:grid}` (0,1,0),
+  collapsing the title slide into a stack. Fixed with `.slide.cover.on{display:grid}`.
+- The Dark Reader browser extension was repainting the whole deck to `#181A1B`, destroying the
+  paper and accent colours. `color-scheme: light` alone did not stop it; `<meta name="darkreader-lock">`
+  did. This would have inverted the deck during the actual presentation on this machine.
 
 **Team name on slide 1 is still a placeholder** (dashed amber box) — fill it before submitting.
 
