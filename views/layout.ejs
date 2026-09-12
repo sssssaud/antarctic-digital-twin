@@ -3,37 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="darkreader-lock">
   <meta name="description" content="Digital Twin console for the Indian Antarctic research stations Maitri and Bharati — SIH 2026 problem statement 26060.">
   <title><%= title %></title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { color-scheme: dark; }
-    body {
-      background-color: #05080f;
-      background-image:
-        radial-gradient(900px circle at 12% -10%, rgba(34,211,238,.10), transparent 55%),
-        radial-gradient(700px circle at 92% 0%, rgba(59,130,246,.10), transparent 50%);
-      background-attachment: fixed;
-    }
-    .panel { background: linear-gradient(180deg, rgba(15,23,42,.82), rgba(8,13,24,.82)); }
-    .grid-lines {
-      background-image:
-        linear-gradient(rgba(148,163,184,.055) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148,163,184,.055) 1px, transparent 1px);
-      background-size: 44px 44px;
-    }
-    .led { box-shadow: 0 0 0 3px rgba(255,255,255,.04), 0 0 14px 2px currentColor; }
-    @keyframes pulse-led { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
-    .led-pulse { animation: pulse-led 1.6s ease-in-out infinite; }
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
-    @media (prefers-reduced-motion: reduce) {
-      .led-pulse { animation: none; }
-      * { transition: none !important; }
-    }
-  </style>
+  <link rel="stylesheet" href="/console.css?v=<%= assetVersion %>">
 </head>
-<body class="grid-lines min-h-screen text-slate-200 antialiased selection:bg-cyan-400/30">
+<body class="min-h-screen antialiased">
   <%- include(view) %>
 </body>
 </html>

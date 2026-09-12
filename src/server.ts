@@ -2,6 +2,7 @@
  * Entry point: boot the in-memory database, seed it, start the live simulator
  * and serve both the JSON API and the mission-control dashboard.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import express, { type ErrorRequestHandler } from 'express';
 import { connectDatabase, disconnectDatabase } from './db';
@@ -21,6 +22,16 @@ export function createApp(): express.Express {
   app.disable('x-powered-by');
 
   app.use(express.json({ limit: '64kb' }));
+
+  const publicDir = path.join(__dirname, '..', 'public');
+
+  // Cached hard, so the stylesheet URL carries its own mtime as a cache key —
+  // without it an edited console.css never reaches a browser that has one.
+  // ponytail: fonts ride the same immutable header; they are versioned by filename.
+  app.locals.assetVersion = String(Math.floor(fs.statSync(path.join(publicDir, 'console.css')).mtimeMs));
+
+  app.use(express.static(publicDir, { maxAge: '1y', immutable: true, index: false }));
+
   app.use('/api', apiRouter);
   app.use('/', viewRouter);
 

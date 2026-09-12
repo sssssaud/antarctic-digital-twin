@@ -15,12 +15,12 @@ SRC = ROOT / "presentation" / "src"
 OUT = ROOT / "presentation" / "deck.html"
 
 ASSETS = {
-    "__SANS400__": (SRC / "fonts/f-sans-400.woff2", "font/woff2"),
-    "__SANS500__": (SRC / "fonts/f-sans-500.woff2", "font/woff2"),
-    "__SANS700__": (SRC / "fonts/f-sans-700.woff2", "font/woff2"),
-    "__SANS800__": (SRC / "fonts/f-sans-800.woff2", "font/woff2"),
-    "__MONO400__": (SRC / "fonts/f-mono-400.woff2", "font/woff2"),
-    "__MONO700__": (SRC / "fonts/f-mono-700.woff2", "font/woff2"),
+    "__SANS400__": (ROOT / "public/fonts/f-sans-400.woff2", "font/woff2"),
+    "__SANS500__": (ROOT / "public/fonts/f-sans-500.woff2", "font/woff2"),
+    "__SANS700__": (ROOT / "public/fonts/f-sans-700.woff2", "font/woff2"),
+    "__SANS800__": (ROOT / "public/fonts/f-sans-800.woff2", "font/woff2"),
+    "__MONO400__": (ROOT / "public/fonts/f-mono-400.woff2", "font/woff2"),
+    "__MONO700__": (ROOT / "public/fonts/f-mono-700.woff2", "font/woff2"),
     "__IMG_MAITRI__": (ROOT / "presentation/assets/maitri.jpg", "image/jpeg"),
     "__IMG_BHARATI__": (ROOT / "presentation/assets/bharati.jpg", "image/jpeg"),
 }

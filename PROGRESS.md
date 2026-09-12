@@ -71,11 +71,51 @@ Two layout bugs the measurement caught that screenshots alone would have missed:
 
 **Team name on slide 1 is still a placeholder** (dashed amber box) — fill it before submitting.
 
+## Console redesign — 2026-09-12
+
+The first dashboard was generic AI output: `#05080f` ground, cyan/blue radial orbs, a grid-line
+backdrop, glowing LED dots, a different neon accent per pillar, and **no `font-family` at all** — so
+it silently inherited Tailwind's `system-ui`. Rebuilt to the deck's design language.
+
+What changed:
+
+- `public/console.css` — the whole design system in one stylesheet. Double-bezel cards, one teal
+  accent, semantic `crit`/`warn`/`ok` tones, monospaced tabular numbers, film grain, staggered
+  entry, `prefers-reduced-motion` and print rules.
+- Fonts `git mv`'d from `presentation/src/fonts/` to `public/fonts/` — one copy now serves both the
+  deck and the dashboard.
+- `views/layout.ejs`, `error.ejs`, `partials/metric.ejs`, `partials/bar.ejs` rewritten; the partials
+  now take `crit`/`warn`/`ok` instead of raw Tailwind colour classes.
+- `views/dashboard.ejs` rebuilt around a sticky left rail (identity + alerts) beside a 2×2 pillar
+  bento. The polling IIFE was kept intact — only the design layer moved.
+
+Three real bugs caught while doing it:
+
+- **Contrast failed WCAG AA.** Measured, not guessed: `--ink3` was 3.78:1 and `--ink4` 2.36:1
+  against the card surface. Darkened to 5.95:1 and 4.53:1; `--warn` also nudged from 4.47 to 5.41.
+- **`immutable` cache locked the stylesheet.** `express.static` served `/console.css` with
+  `max-age=1y, immutable`, so an edited stylesheet never reached a browser that already had one —
+  confirmed live when `--ink3` still read the old value after the fix. The link now carries the
+  file's mtime as a cache key.
+- **Five bars were frozen.** Bars showing a derived ratio had no `data-bar` path, so they sat still
+  while the metric directly above them ticked. All nine now live-update via `data-bar-max`.
+
+Verified in the browser: 6/6 fonts loaded, no horizontal overflow, no element spill, 22 metrics and
+9 bars wired, `darkreader-lock` present, and the alert-signature reload observed firing for real
+when Maitri's satellite uplink dropped mid-session.
+
+Not verified: narrow-viewport rendering. The extension's window resize did not take effect, so the
+mobile collapse rests on standard Tailwind breakpoints and a `minmax(0,1fr)` guard rather than on a
+screenshot.
+
 ## Pending (optional)
 
 - Swap to persistent MongoDB (one line in `src/db.ts`) if data must survive restarts.
 - Per-station detail page; richer historical charts than sparklines.
 - Prune readings (~1 MB/hour accumulates) before any long-running deployment.
+- Confirm the narrow-viewport layout on a real phone or a working devtools resize.
+- `CLAUDE.md` was drafted solo and still needs your review — it should have been filled in together.
+- Deck slide 1 still carries a team-name placeholder; slide 8's reference links need a check.
 
 ## Blockers
 

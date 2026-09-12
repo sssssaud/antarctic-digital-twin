@@ -132,10 +132,13 @@ src/
   routes/                   Router definitions.
   server.ts                 Boot sequence, error middleware, graceful shutdown.
 views/
-  layout.ejs                Dark mission-control wrapper; pulls in the page named by `view`.
-  dashboard.ejs             Four-pillar console, alert banner, sparklines, live poller.
+  layout.ejs                Page shell; pulls in the page named by `view`.
+  dashboard.ejs             Station rail + four-pillar console, sparklines, live poller.
   error.ejs                 404 / 500 page.
   partials/                 metric row, progress bar.
+public/
+  console.css               The console design system — one stylesheet, no build step.
+  fonts/                    Six subsetted woff2 faces, shared with the deck.
 ```
 
 The design rule worth noting: **all physics and alert logic live in `telemetry-engine.ts`, which
@@ -156,10 +159,38 @@ mid-January and bottoms in mid-July, so the austral seasons run the right way ro
 | Database | MongoDB via `mongodb-memory-server` (zero setup) |
 | ODM | Mongoose 8 |
 | Views | EJS (server-side rendering) |
-| Styling | TailwindCSS via CDN |
+| Styling | TailwindCSS via CDN for layout; `public/console.css` for the design system |
+| Type | Plus Jakarta Sans + JetBrains Mono, self-hosted and subsetted (~54 KB total) |
 
 Express 5 rather than 4 — Express 4's `qs` dependency carries two moderate CVEs, and Express 5
 forwards rejected promises to the error handler on its own. `npm audit` reports **0 vulnerabilities**.
+
+---
+
+## The console
+
+The dashboard and the deck share one design language, one palette and one set of font files, so a
+judge moving from slides to screen sees the same instrument.
+
+- **Light instrument panel**, not a dark "mission control" skin. Paper `#E7ECEF`, cards in nested
+  double-bezel enclosures (tinted outer shell, light inner core).
+- **One accent.** Teal `#0E6F68` is the only decorative colour. Red and amber appear *only* where a
+  reading has actually breached a threshold, so colour on screen always means something.
+- **Every number is monospaced** with tabular figures, so digits do not jitter as values tick.
+- **Contrast is WCAG AA** for all text, verified by computing the ratios rather than eyeballing them
+  (the first pass failed at 3.78:1 and was corrected).
+- **Reduced motion is respected** — `prefers-reduced-motion: reduce` drops the stagger and the bar
+  transitions.
+- The stylesheet is served with a one-year immutable cache and a URL keyed on its own mtime, so
+  edits reach returning browsers without breaking the cache win.
+
+Layout: a sticky left rail carries station identity and the live alert list, and the four pillars
+sit in a 2×2 bento to its right. Alerts stay on screen while you scan the pillars — that is the
+whole reason for the asymmetry.
+
+Live behaviour: the page polls `/api/stations/<CODE>` every 5 s and patches 22 metric values and
+9 bars in place. If the *set* of active alerts changes, it reloads, because alert copy and severity
+tints are rendered server-side and must not be reconstructed in the browser.
 
 ---
 

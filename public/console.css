@@ -1,0 +1,148 @@
+/* ── Antarctic Digital Twin · console design system ───────────────────────────
+   Same language as presentation/deck.html: paper ground, Double-Bezel cards,
+   Plus Jakarta Sans + JetBrains Mono, a single teal accent. Tailwind (CDN) still
+   handles layout utilities; everything that carries the look lives here so the
+   console never falls back to Tailwind's default slate/system-ui.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+@font-face{font-family:Jakarta;src:url(/fonts/f-sans-400.woff2)format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:Jakarta;src:url(/fonts/f-sans-500.woff2)format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:Jakarta;src:url(/fonts/f-sans-700.woff2)format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:Jakarta;src:url(/fonts/f-sans-800.woff2)format('woff2');font-weight:800;font-display:swap}
+@font-face{font-family:JBMono;src:url(/fonts/f-mono-400.woff2)format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:JBMono;src:url(/fonts/f-mono-700.woff2)format('woff2');font-weight:700;font-display:swap}
+
+:root{
+  color-scheme:light;
+  --ink:#0B1016; --ink2:#3D4952; --ink3:#4E5A63; --ink4:#5F6C76;
+  --paper:#E7ECEF; --surface:#F7F9FA; --surface2:#FFFFFF;
+  --shell:rgba(11,16,22,.045); --hair:rgba(11,16,22,.10); --hair-soft:rgba(11,16,22,.06);
+  --accent:#0E6F68; --accent-ink:#0A534E; --accent-soft:rgba(14,111,104,.09);
+  --crit:#A8301C; --crit-soft:rgba(168,48,28,.07); --crit-line:rgba(168,48,28,.18);
+  --warn:#7A590E; --warn-soft:rgba(138,101,18,.07); --warn-line:rgba(138,101,18,.18);
+  --ok:#2F6D3F;
+  --lift:0 1px 2px rgba(11,16,22,.04), 0 14px 34px -16px rgba(11,16,22,.16);
+  --lift-sm:0 1px 2px rgba(11,16,22,.03), 0 6px 18px -10px rgba(11,16,22,.12);
+  --inner:inset 0 1px 0 rgba(255,255,255,.9);
+  --ease:cubic-bezier(.32,.72,0,1);
+  --r-out:22px; --r-in:16px;
+}
+
+html{background:var(--paper)}
+body{
+  background:var(--paper);
+  font-family:Jakarta,ui-sans-serif,sans-serif;
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  font-feature-settings:"kern" 1,"liga" 1;
+}
+/* Numbers are the content here. Tabular mono everywhere, no exceptions. */
+.mono,[data-metric],[data-role="num"]{font-family:JBMono,ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+::selection{background:var(--accent-soft);color:var(--accent-ink)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(11,16,22,.16);border-radius:99px;border:3px solid var(--paper)}
+::-webkit-scrollbar-thumb:hover{background:rgba(11,16,22,.26)}
+
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+/* ── Double-Bezel: outer shell + inner core, concentric radii ─────────────── */
+.bez{background:var(--shell);border:1px solid var(--hair-soft);border-radius:var(--r-out);
+  padding:5px;box-shadow:var(--lift-sm);display:flex;min-height:0}
+.bez>.core{background:var(--surface);border-radius:var(--r-in);padding:16px 18px;flex:1;min-width:0;
+  box-shadow:var(--inner);display:flex;flex-direction:column}
+.bez.raised>.core{background:linear-gradient(165deg,var(--surface2),#F2F6F7)}
+.bez.tint{background:var(--accent-soft);border-color:rgba(14,111,104,.14)}
+.bez.alarm{background:var(--crit-soft);border-color:var(--crit-line)}
+.bez.caution{background:var(--warn-soft);border-color:var(--warn-line)}
+
+/* ── Type scale ───────────────────────────────────────────────────────────── */
+.eyebrow{font-family:JBMono,monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink4);font-weight:400}
+.eyebrow.on{color:var(--accent)}
+.pillar-h{font-size:12px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.station-h{font-size:30px;font-weight:800;letter-spacing:-.032em;line-height:1.02}
+.sub{font-size:12px;color:var(--ink3);line-height:1.5}
+
+/* ── Metric row: no hairline under every row, only between groups ─────────── */
+.mrow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:5.5px 0}
+.mrow+.mrow{border-top:1px solid var(--hair-soft)}
+.mrow .ml{font-size:11px;color:var(--ink3);letter-spacing:-.005em}
+.mrow .mv{font-family:JBMono,monospace;font-variant-numeric:tabular-nums;font-size:12.5px;
+  font-weight:700;color:var(--ink);white-space:nowrap}
+.mrow .mu{font-size:9.5px;font-weight:400;color:var(--ink4);margin-left:3px}
+.mv.crit{color:var(--crit)} .mv.warn{color:var(--warn)} .mv.ok{color:var(--ok)}
+
+/* ── Bars ─────────────────────────────────────────────────────────────────── */
+.bar-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:5px}
+.bar-t{height:5px;border-radius:99px;background:rgba(11,16,22,.07);overflow:hidden}
+.bar-f{height:100%;border-radius:99px;background:var(--accent);
+  transition:width .9s var(--ease)}
+.bar-f.crit{background:var(--crit)} .bar-f.warn{background:var(--warn)}
+
+/* ── Status pill ──────────────────────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:7px;border-radius:99px;padding:6px 14px 6px 11px;
+  font-family:JBMono,monospace;font-size:11px;font-weight:700;letter-spacing:.12em;
+  border:1px solid transparent}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.pill.nominal{color:var(--ok);background:rgba(47,109,63,.08);border-color:rgba(47,109,63,.2)}
+.pill.degraded{color:var(--warn);background:var(--warn-soft);border-color:var(--warn-line)}
+.pill.critical{color:var(--crit);background:var(--crit-soft);border-color:var(--crit-line)}
+
+/* ── Station switcher: segmented control, not neon tabs ───────────────────── */
+.seg{display:inline-flex;background:var(--shell);border:1px solid var(--hair-soft);
+  border-radius:99px;padding:3px;gap:2px}
+.seg a{display:inline-flex;align-items:center;gap:7px;border-radius:99px;padding:6px 13px;
+  font-size:11.5px;font-weight:500;color:var(--ink3);text-decoration:none;
+  transition:color .4s var(--ease),background .4s var(--ease)}
+.seg a:hover{color:var(--ink)}
+.seg a[aria-current]{background:var(--surface2);color:var(--ink);font-weight:700;box-shadow:var(--lift-sm)}
+.seg .sdot{width:5px;height:5px;border-radius:50%;flex:none}
+.sdot.nominal{background:var(--ok)} .sdot.degraded{background:var(--warn)} .sdot.critical{background:var(--crit)}
+
+/* ── Alerts ───────────────────────────────────────────────────────────────── */
+.alert{display:flex;gap:10px;align-items:baseline;padding:7px 0;font-size:12px;line-height:1.5}
+.alert+.alert{border-top:1px solid var(--hair-soft)}
+.alert .tag{font-family:JBMono,monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
+  padding:2.5px 6px;border-radius:5px;flex:none;min-width:74px;text-align:center}
+.alert.c .tag{background:rgba(168,48,28,.12);color:var(--crit)}
+.alert.w .tag{background:rgba(138,101,18,.12);color:var(--warn)}
+.alert .msg{color:var(--ink2)}
+.alert.c .msg{color:var(--ink)}
+
+/* ── Button-in-button CTA ─────────────────────────────────────────────────── */
+.cta{display:inline-flex;align-items:center;gap:9px;background:var(--ink);color:#F2F6F7;
+  border-radius:99px;padding:6px 6px 6px 15px;font-size:11.5px;font-weight:500;text-decoration:none;
+  transition:transform .5s var(--ease)}
+.cta:hover{transform:translateY(-1px)}
+.cta:active{transform:scale(.98)}
+.cta .ic{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.12);
+  display:grid;place-items:center;font-size:10px;
+  transition:transform .5s var(--ease),background .5s var(--ease)}
+.cta:hover .ic{transform:translate(2px,-2px);background:rgba(255,255,255,.2)}
+
+/* ── Film grain, fixed and inert ──────────────────────────────────────────── */
+body::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.045;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E")}
+
+/* ── Entry motion: transform and opacity only ─────────────────────────────── */
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.stg>*{animation:rise .6s var(--ease) both}
+.stg>*:nth-child(1){animation-delay:.02s} .stg>*:nth-child(2){animation-delay:.07s}
+.stg>*:nth-child(3){animation-delay:.12s} .stg>*:nth-child(4){animation-delay:.17s}
+.stg>*:nth-child(5){animation-delay:.22s} .stg>*:nth-child(6){animation-delay:.27s}
+
+@media (prefers-reduced-motion:reduce){
+  .stg>*{animation:none}
+  .bar-f{transition:none}
+  *{transition-duration:.01ms!important}
+}
+
+@media print{
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body::after{display:none}
+  .bez{box-shadow:none;break-inside:avoid}
+  .seg,.cta{display:none}
+}

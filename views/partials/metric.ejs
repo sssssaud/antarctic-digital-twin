@@ -1,13 +1,11 @@
 <%
   // locals: label, value, unit, metric (dot-path for live updates), dp, tone
-  const metricTone = typeof tone !== 'undefined' && tone ? tone : 'text-slate-100';
+  const metricTone = typeof tone !== 'undefined' && tone ? tone : '';
   const metricDp = typeof dp !== 'undefined' ? dp : 1;
   const metricPath = typeof metric !== 'undefined' ? metric : '';
   const metricUnit = typeof unit !== 'undefined' && unit ? unit : '';
 %>
-<div class="flex items-baseline justify-between gap-3 border-b border-white/5 py-[7px] last:border-0">
-  <span class="text-[11px] uppercase tracking-[0.14em] text-slate-400"><%= label %></span>
-  <span class="shrink-0 font-mono text-[13px] tabular-nums <%= metricTone %>">
-    <span<% if (metricPath) { %> data-metric="<%= metricPath %>" data-dp="<%= metricDp %>"<% } %>><%= value %></span><% if (metricUnit) { %><span class="ml-1 text-[10px] text-slate-500"><%= metricUnit %></span><% } %>
-  </span>
+<div class="mrow">
+  <span class="ml"><%= label %></span>
+  <span class="mv <%= metricTone %>"><span<% if (metricPath) { %> data-metric="<%= metricPath %>" data-dp="<%= metricDp %>"<% } %>><%= value %></span><% if (metricUnit) { %><span class="mu"><%= metricUnit %></span><% } %></span>
 </div>
