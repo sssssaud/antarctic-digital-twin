@@ -1,0 +1,378 @@
+<%
+  const st = active.station;
+  const r  = active.reading;
+
+  const STATUS = {
+    nominal:  { label: 'NOMINAL',  text: 'text-emerald-300', dot: 'text-emerald-400', ring: 'border-emerald-400/30', chip: 'bg-emerald-400/10' },
+    degraded: { label: 'DEGRADED', text: 'text-amber-300',   dot: 'text-amber-400',   ring: 'border-amber-400/30',   chip: 'bg-amber-400/10' },
+    critical: { label: 'CRITICAL', text: 'text-rose-300',    dot: 'text-rose-400',    ring: 'border-rose-400/30',    chip: 'bg-rose-400/10' },
+  };
+  const meta = STATUS[active.status];
+
+  const criticals = active.alerts.filter(a => a.severity === 'critical');
+  const warnings  = active.alerts.filter(a => a.severity === 'warning');
+
+  const coord = (value, pos, neg) => Math.abs(value).toFixed(4) + '° ' + (value >= 0 ? pos : neg);
+
+  // Pillar accent colours keep the four domains visually distinct.
+  const PILLARS = {
+    environment:    { name: 'Environment',    accent: 'text-sky-300',     rule: 'from-sky-400/60' },
+    energy:         { name: 'Energy',         accent: 'text-amber-300',   rule: 'from-amber-400/60' },
+    infrastructure: { name: 'Infrastructure', accent: 'text-violet-300',  rule: 'from-violet-400/60' },
+    logistics:      { name: 'Logistics',      accent: 'text-teal-300',    rule: 'from-teal-400/60' },
+  };
+%>
+
+<header class="sticky top-0 z-20 border-b border-white/5 bg-[#05080f]/85 backdrop-blur">
+  <div class="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+    <div class="flex items-center gap-3">
+      <div class="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10">
+        <svg viewBox="0 0 24 24" class="h-5 w-5 text-cyan-300" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M12 2.8 21 20H3z" stroke-linejoin="round"/><path d="M7.6 13.2h8.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-sm font-semibold tracking-[0.18em] text-slate-100">ANTARCTIC DIGITAL TWIN</h1>
+        <p class="text-[11px] text-slate-500">Maitri &amp; Bharati &middot; MoES / NCPOR &middot; PS 26060</p>
+      </div>
+    </div>
+
+    <nav class="flex items-center gap-2" aria-label="Station selection">
+      <% snapshots.forEach(function (snap) {
+           const isActive = snap.station.code === st.code;
+           const sMeta = STATUS[snap.status];
+      %>
+        <a href="/?station=<%= snap.station.code %>"
+           <%= isActive ? 'aria-current="page"' : '' %>
+           class="group flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[11px] font-medium tracking-[0.12em] transition
+                  <%= isActive ? 'border-cyan-400/40 bg-cyan-400/10 text-cyan-100' : 'border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20 hover:text-slate-200' %>">
+          <span class="led led-pulse h-1.5 w-1.5 rounded-full bg-current <%= sMeta.dot %>"></span>
+          <%= snap.station.name.toUpperCase() %>
+        </a>
+      <% }); %>
+    </nav>
+
+    <div class="ml-auto flex items-center gap-4 text-[11px] text-slate-400">
+      <span class="hidden sm:inline">LIVE FEED</span>
+      <span class="font-mono tabular-nums text-slate-200" id="utc-clock">--:--:-- UTC</span>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+
+  <!-- Station identity strip -->
+  <section class="panel rounded-2xl border <%= meta.ring %> p-5 shadow-2xl shadow-black/40">
+    <div class="flex flex-wrap items-start justify-between gap-6">
+      <div>
+        <div class="flex items-center gap-3">
+          <h2 class="text-2xl font-semibold tracking-tight text-slate-50"><%= st.name %></h2>
+          <span class="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px] text-slate-400"><%= st.code %></span>
+        </div>
+        <p class="mt-1 text-sm text-slate-400"><%= st.region %></p>
+        <p class="mt-0.5 font-mono text-[11px] text-slate-500">
+          <%= coord(st.coordinates.latitude, 'N', 'S') %> &nbsp; <%= coord(st.coordinates.longitude, 'E', 'W') %>
+          &nbsp;&middot;&nbsp; commissioned <%= st.commissionedYear %>
+        </p>
+      </div>
+
+      <div class="flex items-center gap-6">
+        <div class="text-right">
+          <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">Crew on station</p>
+          <p class="font-mono text-xl tabular-nums text-slate-100">
+            <span data-metric="logistics.crewOnStation" data-dp="0"><%= r ? helpers.int(r.logistics.crewOnStation) : '--' %></span><span class="text-sm text-slate-500">/<%= st.crewCapacity %></span>
+          </p>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">Last contact</p>
+          <p class="font-mono text-xs tabular-nums text-slate-300" id="last-contact"><%= helpers.stamp(active.recordedAt) %></p>
+        </div>
+        <div class="flex items-center gap-2.5 rounded-xl border <%= meta.ring %> <%= meta.chip %> px-4 py-2.5">
+          <span class="led led-pulse h-2.5 w-2.5 rounded-full bg-current <%= meta.dot %>"></span>
+          <span class="font-mono text-sm font-semibold tracking-[0.16em] <%= meta.text %>"><%= meta.label %></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Alert banner -->
+  <section class="mt-4" aria-live="polite" aria-label="Active alerts">
+    <% if (active.alerts.length === 0) { %>
+      <div class="flex items-center gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.06] px-4 py-3">
+        <span class="led h-2 w-2 rounded-full bg-current text-emerald-400"></span>
+        <p class="text-sm text-emerald-200">All four pillars within operating envelope — no active alerts.</p>
+      </div>
+    <% } else { %>
+      <div class="grid gap-2">
+        <% if (criticals.length) { %>
+          <div class="rounded-xl border border-rose-500/30 bg-rose-500/[0.08] p-4">
+            <p class="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-300">
+              <span class="led led-pulse h-2 w-2 rounded-full bg-current"></span>
+              <%= criticals.length %> critical <%= criticals.length === 1 ? 'alert' : 'alerts' %>
+            </p>
+            <ul class="space-y-1.5">
+              <% criticals.forEach(function (a) { %>
+                <li class="flex flex-wrap items-baseline gap-x-2.5 text-sm text-rose-100">
+                  <span class="rounded bg-rose-500/20 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-rose-200"><%= PILLARS[a.pillar].name %></span>
+                  <span><%= a.message %></span>
+                </li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+        <% if (warnings.length) { %>
+          <div class="rounded-xl border border-amber-400/25 bg-amber-400/[0.06] p-4">
+            <p class="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">
+              <span class="led h-2 w-2 rounded-full bg-current"></span>
+              <%= warnings.length %> <%= warnings.length === 1 ? 'warning' : 'warnings' %>
+            </p>
+            <ul class="space-y-1.5">
+              <% warnings.forEach(function (a) { %>
+                <li class="flex flex-wrap items-baseline gap-x-2.5 text-sm text-amber-100">
+                  <span class="rounded bg-amber-400/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-200"><%= PILLARS[a.pillar].name %></span>
+                  <span><%= a.message %></span>
+                </li>
+              <% }); %>
+            </ul>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+  </section>
+
+  <% if (!r) { %>
+    <p class="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-6 text-sm text-slate-400">
+      No telemetry recorded for this station yet.
+    </p>
+  <% } else { %>
+
+  <!-- Four pillars -->
+  <section class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+
+    <!-- ENVIRONMENT -->
+    <article class="panel rounded-2xl border border-white/10 p-4">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-[11px] font-semibold uppercase tracking-[0.2em] <%= PILLARS.environment.accent %>">Environment</h3>
+        <% if (r.environment.blizzard) { %>
+          <span class="rounded bg-rose-500/20 px-2 py-0.5 font-mono text-[10px] tracking-wider text-rose-200">BLIZZARD</span>
+        <% } %>
+      </div>
+      <div class="h-px bg-gradient-to-r <%= PILLARS.environment.rule %> to-transparent"></div>
+
+      <div class="mt-1">
+        <%- include('partials/metric', { label: 'Air temperature', value: helpers.num(r.environment.temperatureC), unit: '°C', metric: 'environment.temperatureC', dp: 1, tone: 'text-sky-200' }) %>
+        <%- include('partials/metric', { label: 'Wind chill', value: helpers.num(r.environment.windChillC), unit: '°C', metric: 'environment.windChillC', dp: 1, tone: r.environment.windChillC <= -45 ? 'text-rose-300' : 'text-slate-100' }) %>
+        <%- include('partials/metric', { label: 'Wind sustained', value: helpers.num(r.environment.windSpeedKts), unit: 'kts', metric: 'environment.windSpeedKts', dp: 1, tone: r.environment.windSpeedKts >= 45 ? 'text-rose-300' : (r.environment.windSpeedKts >= 34 ? 'text-amber-300' : 'text-slate-100') }) %>
+        <%- include('partials/metric', { label: 'Peak gust', value: helpers.num(r.environment.windGustKts), unit: 'kts', metric: 'environment.windGustKts', dp: 1 }) %>
+        <%- include('partials/metric', { label: 'Visibility', value: helpers.int(r.environment.visibilityM), unit: 'm', metric: 'environment.visibilityM', dp: 0, tone: r.environment.visibilityM < 100 ? 'text-rose-300' : (r.environment.visibilityM < 1000 ? 'text-amber-300' : 'text-slate-100') }) %>
+        <%- include('partials/metric', { label: 'Humidity', value: helpers.num(r.environment.humidityPct), unit: '%', metric: 'environment.humidityPct', dp: 1 }) %>
+        <%- include('partials/metric', { label: 'Pressure', value: helpers.num(r.environment.pressureHpa), unit: 'hPa', metric: 'environment.pressureHpa', dp: 1 }) %>
+        <%- include('partials/metric', { label: 'Snow depth', value: helpers.num(r.environment.snowDepthCm), unit: 'cm', metric: 'environment.snowDepthCm', dp: 1 }) %>
+      </div>
+
+      <div class="mt-3 rounded-lg border border-white/5 bg-black/20 p-2.5">
+        <p class="mb-1 flex justify-between text-[10px] uppercase tracking-[0.14em] text-slate-500">
+          <span>Temperature &middot; last 8 h</span>
+          <span class="font-mono"><%= helpers.num(Math.min.apply(null, series.temperature)) %> / <%= helpers.num(Math.max.apply(null, series.temperature)) %> °C</span>
+        </p>
+        <svg viewBox="0 0 240 44" preserveAspectRatio="none" class="h-11 w-full" role="img" aria-label="Air temperature trend for the last eight hours">
+          <polyline points="<%= sparklines.temperature %>" fill="none" stroke="#7dd3fc" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+    </article>
+
+    <!-- ENERGY -->
+    <article class="panel rounded-2xl border border-white/10 p-4">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-[11px] font-semibold uppercase tracking-[0.2em] <%= PILLARS.energy.accent %>">Energy</h3>
+        <span class="font-mono text-[10px] text-slate-500"><%= st.generatorCapacityKw %> kW rated</span>
+      </div>
+      <div class="h-px bg-gradient-to-r <%= PILLARS.energy.rule %> to-transparent"></div>
+
+      <div class="mt-1">
+        <%- include('partials/metric', { label: 'Site demand', value: helpers.num(r.energy.demandKw), unit: 'kW', metric: 'energy.demandKw', dp: 1 }) %>
+        <%- include('partials/metric', { label: 'Generator load', value: helpers.num(r.energy.generatorLoadKw), unit: 'kW', metric: 'energy.generatorLoadKw', dp: 1, tone: r.energy.generatorLoadKw > st.generatorCapacityKw * 0.9 ? 'text-amber-300' : 'text-slate-100' }) %>
+        <%- include('partials/metric', { label: 'Solar array', value: helpers.num(r.energy.solarOutputKw), unit: 'kW', metric: 'energy.solarOutputKw', dp: 1, tone: 'text-amber-200' }) %>
+        <%- include('partials/metric', { label: 'Wind turbines', value: helpers.num(r.energy.windOutputKw), unit: 'kW', metric: 'energy.windOutputKw', dp: 1, tone: 'text-amber-200' }) %>
+        <%- include('partials/metric', { label: 'Diesel remaining', value: helpers.int(r.energy.dieselLitres), unit: 'L', metric: 'energy.dieselLitres', dp: 0 }) %>
+      </div>
+
+      <%- include('partials/bar', {
+            label: 'Diesel reserve', pct: helpers.pct(r.energy.dieselLevelPct),
+            caption: helpers.num(r.energy.dieselLevelPct) + '%',
+            barPath: 'energy.dieselLevelPct', barMax: 100,
+            tone: r.energy.dieselLevelPct < 15 ? 'bg-rose-400' : (r.energy.dieselLevelPct < 30 ? 'bg-amber-400' : 'bg-emerald-400') }) %>
+      <%- include('partials/bar', {
+            label: 'Generator utilisation', pct: helpers.pct((r.energy.generatorLoadKw / st.generatorCapacityKw) * 100),
+            caption: Math.round((r.energy.generatorLoadKw / st.generatorCapacityKw) * 100) + '%',
+            tone: r.energy.generatorLoadKw > st.generatorCapacityKw * 0.9 ? 'bg-amber-400' : 'bg-cyan-400' }) %>
+      <%- include('partials/bar', {
+            label: 'Battery bank', pct: helpers.pct(r.energy.batterySocPct),
+            caption: helpers.num(r.energy.batterySocPct) + '%',
+            barPath: 'energy.batterySocPct', barMax: 100,
+            tone: r.energy.batterySocPct < 25 ? 'bg-amber-400' : 'bg-emerald-400' }) %>
+    </article>
+
+    <!-- INFRASTRUCTURE -->
+    <article class="panel rounded-2xl border border-white/10 p-4">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-[11px] font-semibold uppercase tracking-[0.2em] <%= PILLARS.infrastructure.accent %>">Infrastructure</h3>
+        <%
+          const hvacTone = r.infrastructure.hvacStatus === 'fault' ? 'bg-rose-500/20 text-rose-200'
+                         : r.infrastructure.hvacStatus === 'strained' ? 'bg-amber-400/15 text-amber-200'
+                         : 'bg-emerald-400/15 text-emerald-200';
+        %>
+        <span class="rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider <%= hvacTone %>">HVAC <%= r.infrastructure.hvacStatus %></span>
+      </div>
+      <div class="h-px bg-gradient-to-r <%= PILLARS.infrastructure.rule %> to-transparent"></div>
+
+      <div class="mt-1">
+        <%- include('partials/metric', { label: 'Habitat temperature', value: helpers.num(r.infrastructure.indoorTempC), unit: '°C', metric: 'infrastructure.indoorTempC', dp: 1, tone: r.infrastructure.indoorTempC < 16 ? 'text-rose-300' : 'text-violet-200' }) %>
+        <%- include('partials/metric', { label: 'Water reserve', value: helpers.int(r.infrastructure.waterReserveL), unit: 'L', metric: 'infrastructure.waterReserveL', dp: 0 }) %>
+        <%- include('partials/metric', { label: 'Uplink latency', value: r.infrastructure.commsStatus === 'down' ? 'NO LINK' : helpers.int(r.infrastructure.uplinkLatencyMs), unit: r.infrastructure.commsStatus === 'down' ? '' : 'ms', metric: 'infrastructure.uplinkLatencyMs', dp: 0, tone: r.infrastructure.commsStatus === 'online' ? 'text-slate-100' : 'text-amber-300' }) %>
+        <%- include('partials/metric', { label: 'Satellite link', value: r.infrastructure.commsStatus.toUpperCase(), unit: '', tone: r.infrastructure.commsStatus === 'down' ? 'text-rose-300' : (r.infrastructure.commsStatus === 'degraded' ? 'text-amber-300' : 'text-emerald-300') }) %>
+      </div>
+
+      <%- include('partials/bar', {
+            label: 'Water tank', pct: helpers.pct((r.infrastructure.waterReserveL / st.waterCapacityL) * 100),
+            caption: Math.round((r.infrastructure.waterReserveL / st.waterCapacityL) * 100) + '%',
+            tone: r.infrastructure.waterReserveL < st.waterCapacityL * 0.15 ? 'bg-amber-400' : 'bg-sky-400' }) %>
+      <%- include('partials/bar', {
+            label: 'Structural integrity', pct: helpers.pct(r.infrastructure.structuralIntegrityPct),
+            caption: helpers.num(r.infrastructure.structuralIntegrityPct) + '%',
+            barPath: 'infrastructure.structuralIntegrityPct', barMax: 100,
+            tone: r.infrastructure.structuralIntegrityPct < 85 ? 'bg-amber-400' : 'bg-violet-400' }) %>
+      <%- include('partials/bar', {
+            label: 'Waste tank', pct: helpers.pct(r.infrastructure.wasteTankPct),
+            caption: helpers.num(r.infrastructure.wasteTankPct) + '%',
+            barPath: 'infrastructure.wasteTankPct', barMax: 100,
+            tone: r.infrastructure.wasteTankPct > 85 ? 'bg-amber-400' : 'bg-slate-400' }) %>
+    </article>
+
+    <!-- LOGISTICS -->
+    <article class="panel rounded-2xl border border-white/10 p-4">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-[11px] font-semibold uppercase tracking-[0.2em] <%= PILLARS.logistics.accent %>">Logistics</h3>
+        <span class="font-mono text-[10px] text-slate-500">cap. <%= st.crewCapacity %></span>
+      </div>
+      <div class="h-px bg-gradient-to-r <%= PILLARS.logistics.rule %> to-transparent"></div>
+
+      <div class="mt-1">
+        <%- include('partials/metric', { label: 'Crew on station', value: helpers.int(r.logistics.crewOnStation), unit: 'pax', metric: 'logistics.crewOnStation', dp: 0, tone: 'text-teal-200' }) %>
+        <%- include('partials/metric', { label: 'Rations remaining', value: helpers.num(r.logistics.foodDaysRemaining, 1), unit: 'days', metric: 'logistics.foodDaysRemaining', dp: 1, tone: r.logistics.foodDaysRemaining < 30 ? 'text-rose-300' : (r.logistics.foodDaysRemaining < 60 ? 'text-amber-300' : 'text-slate-100') }) %>
+        <%- include('partials/metric', { label: 'Next resupply', value: helpers.num(r.logistics.nextResupplyDays, 1), unit: 'days', metric: 'logistics.nextResupplyDays', dp: 1, tone: r.logistics.nextResupplyDays > r.logistics.foodDaysRemaining ? 'text-rose-300' : 'text-slate-100' }) %>
+        <%- include('partials/metric', { label: 'Medical kits', value: helpers.int(r.logistics.medicalKits), unit: '', metric: 'logistics.medicalKits', dp: 0, tone: r.logistics.medicalKits < 5 ? 'text-amber-300' : 'text-slate-100' }) %>
+        <%- include('partials/metric', { label: 'Cargo awaiting', value: helpers.num(r.logistics.pendingCargoTonnes), unit: 't', metric: 'logistics.pendingCargoTonnes', dp: 1 }) %>
+      </div>
+
+      <%- include('partials/bar', {
+            label: 'Station occupancy', pct: helpers.pct((r.logistics.crewOnStation / st.crewCapacity) * 100),
+            caption: r.logistics.crewOnStation + ' / ' + st.crewCapacity,
+            tone: 'bg-teal-400' }) %>
+      <%- include('partials/bar', {
+            label: 'Ration endurance', pct: helpers.pct((r.logistics.foodDaysRemaining / 180) * 100),
+            caption: Math.floor(r.logistics.foodDaysRemaining) + ' d',
+            tone: r.logistics.foodDaysRemaining < 30 ? 'bg-rose-400' : (r.logistics.foodDaysRemaining < 60 ? 'bg-amber-400' : 'bg-teal-400') }) %>
+      <%- include('partials/bar', {
+            label: 'Resupply countdown', pct: helpers.pct(100 - (r.logistics.nextResupplyDays / 90) * 100),
+            caption: Math.ceil(r.logistics.nextResupplyDays) + ' d out',
+            tone: r.logistics.nextResupplyDays > r.logistics.foodDaysRemaining ? 'bg-rose-400' : 'bg-cyan-400' }) %>
+    </article>
+  </section>
+
+  <!-- Trend strip -->
+  <section class="mt-4 grid gap-4 md:grid-cols-2">
+    <div class="panel rounded-2xl border border-white/10 p-4">
+      <p class="mb-2 flex justify-between text-[10px] uppercase tracking-[0.16em] text-slate-500">
+        <span>Sustained wind &middot; last 8 h</span>
+        <span class="font-mono"><%= helpers.num(Math.max.apply(null, series.wind)) %> kts peak</span>
+      </p>
+      <svg viewBox="0 0 240 44" preserveAspectRatio="none" class="h-14 w-full" role="img" aria-label="Sustained wind speed trend for the last eight hours">
+        <polyline points="<%= sparklines.wind %>" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+    <div class="panel rounded-2xl border border-white/10 p-4">
+      <p class="mb-2 flex justify-between text-[10px] uppercase tracking-[0.16em] text-slate-500">
+        <span>Site power demand &middot; last 8 h</span>
+        <span class="font-mono"><%= helpers.num(Math.max.apply(null, series.demand)) %> kW peak</span>
+      </p>
+      <svg viewBox="0 0 240 44" preserveAspectRatio="none" class="h-14 w-full" role="img" aria-label="Site power demand trend for the last eight hours">
+        <polyline points="<%= sparklines.demand %>" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+  </section>
+  <% } %>
+
+  <footer class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4 text-[11px] text-slate-500">
+    <p>
+      Simulated telemetry — physics-based twin seeded on boot, advancing live.
+      Not connected to live NCPOR station feeds.
+    </p>
+    <p class="font-mono">
+      rendered <%= helpers.stamp(generatedAt) %> &middot; <%= history.length %> samples &middot;
+      <a class="text-cyan-400/80 underline-offset-2 hover:underline" href="/api/stations/<%= st.code %>">JSON API</a>
+    </p>
+  </footer>
+</main>
+
+<script>
+  (function () {
+    var CODE = <%- JSON.stringify(st.code) %>;
+    var signature = <%- JSON.stringify(active.alerts.map(function (a) { return a.code; }).join('|')) %>;
+
+    function tickClock() {
+      var el = document.getElementById('utc-clock');
+      if (el) el.textContent = new Date().toISOString().slice(11, 19) + ' UTC';
+    }
+    tickClock();
+    setInterval(tickClock, 1000);
+
+    function valueAt(source, path) {
+      return path.split('.').reduce(function (acc, key) {
+        return acc === null || acc === undefined ? undefined : acc[key];
+      }, source);
+    }
+
+    function render(value, dp) {
+      if (typeof value !== 'number') return String(value);
+      return dp === 0 ? Math.round(value).toLocaleString('en-IN') : value.toFixed(dp);
+    }
+
+    async function poll() {
+      try {
+        var response = await fetch('/api/stations/' + CODE, { headers: { accept: 'application/json' } });
+        if (!response.ok) return;
+        var payload = await response.json();
+        var snapshot = payload && payload.data;
+        if (!snapshot || !snapshot.reading) return;
+
+        document.querySelectorAll('[data-metric]').forEach(function (el) {
+          var value = valueAt(snapshot.reading, el.dataset.metric);
+          if (value === undefined || value === null) return;
+          el.textContent = render(value, Number(el.dataset.dp || 1));
+        });
+
+        document.querySelectorAll('[data-bar]').forEach(function (el) {
+          var value = valueAt(snapshot.reading, el.dataset.bar);
+          if (typeof value !== 'number') return;
+          var max = Number(el.dataset.barMax || 100) || 100;
+          el.style.width = Math.max(0, Math.min(100, (value / max) * 100)) + '%';
+        });
+
+        var stamp = document.getElementById('last-contact');
+        if (stamp && snapshot.recordedAt) {
+          stamp.textContent = String(snapshot.recordedAt).replace('T', ' ').slice(0, 19) + ' UTC';
+        }
+
+        // Alerts are rendered server-side; when the alert set changes, reload so the
+        // banner stays the single source of truth instead of duplicating markup here.
+        var next = (snapshot.alerts || []).map(function (a) { return a.code; }).join('|');
+        if (next !== signature) window.location.reload();
+      } catch (error) {
+        // A dropped poll is expected on a slow link — the next tick retries.
+      }
+    }
+
+    setInterval(poll, 5000);
+  })();
+</script>

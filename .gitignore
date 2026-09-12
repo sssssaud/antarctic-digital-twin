@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# node / build
+node_modules/
+dist/
+*.tsbuildinfo
+
+# mongodb-memory-server downloaded binaries (~176 MB)
+.cache/
+mongodb-binaries/
+
+# logs
+*.log
+npm-debug.log*
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
