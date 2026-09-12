@@ -15,6 +15,8 @@ specifying a fixed stack and four execution phases.
 | 2 | `db.ts` (in-memory MongoDB), `models/station.ts`, `models/telemetry.ts` | ✅ |
 | 3 | `seeder.ts` (+ live simulator), controllers, routes, `server.ts` | ✅ |
 | 4 | `layout.ejs`, `dashboard.ejs`, `error.ejs`, partials — dark mission-control, 4 pillars | ✅ |
+| — | Published to GitHub: github.com/sssssaud/antarctic-digital-twin (public) | ✅ |
+| — | `presentation/deck.html` — 8-slide SIH pitch deck, self-contained | ✅ |
 
 Beyond the prompt's minimum:
 - Pure `telemetry-engine.ts` (NWS wind-chill formula, austral seasonal curve, bounded random walk,
@@ -41,6 +43,18 @@ Beyond the prompt's minimum:
   the station to the random walk's floor. Fixed to target `seasonal − 9`.
 - **Default station is MAITRI, set explicitly.** It was falling through to `snapshots[0]`, which is
   alphabetical — so the landing page silently showed Bharati.
+
+## Presentation
+
+`presentation/deck.html`, 8 slides on the SIH idea-submission sections. Single self-contained
+file — screenshots base64-embedded, no CDN, works offline. Arrow keys navigate, Ctrl+P exports
+PDF with Background graphics enabled.
+
+Verified: all 8 slides measured at zero overflow in both axes, both embedded images decode.
+Chrome's screenshot capture kept timing out on this page, so layout was checked by measuring
+the DOM rather than by eye.
+
+**Team name on slide 1 is still a placeholder** (dashed amber box) — fill it before submitting.
 
 ## Pending (optional)
 

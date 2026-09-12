@@ -163,6 +163,18 @@ forwards rejected promises to the error handler on its own. `npm audit` reports 
 
 ---
 
+## Presentation
+
+`presentation/deck.html` is the 8-slide pitch deck, following the SIH idea-submission
+sections (problem, solution, technical approach, prototype, feasibility, impact, references).
+
+Open it in any browser — arrow keys move between slides. It is a single self-contained file:
+the dashboard screenshots are embedded, nothing is fetched from a CDN, so it works with no
+internet at all. `Ctrl+P` exports it to PDF (tick **Background graphics**).
+
+The screenshots are also kept unembedded in `presentation/assets/` for use in submission forms.
+If you replace them there, re-embed them into the deck — the HTML carries its own copy.
+
 ## Honest limitations
 
 - **The telemetry is simulated, not live.** There is no NCPOR feed behind this; it is a physics-shaped
