@@ -44,6 +44,12 @@
       <% }); %>
     </nav>
 
+    <nav class="seg" aria-label="View selection">
+      <a href="/?station=<%= st.code %>" aria-current="page">Console</a>
+      <%# Only Bharati has a traced architectural set, so say so when you are not on it. %>
+      <a href="/twin">3D Twin<%= st.code === 'BHARATI' ? '' : ' \u00b7 Bharati' %></a>
+    </nav>
+
     <div class="ml-auto flex items-baseline gap-5">
       <span class="eyebrow">Live feed</span>
       <span class="mono" id="utc-clock" style="font-size:12px;font-weight:700">--:--:-- UTC</span>

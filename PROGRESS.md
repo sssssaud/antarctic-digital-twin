@@ -108,12 +108,67 @@ Not verified: narrow-viewport rendering. The extension's window resize did not t
 mobile collapse rests on standard Tailwind breakpoints and a `minmax(0,1fr)` guard rather than on a
 screenshot.
 
+## Bharati 3D twin — 2026-09-13
+
+Branch `worktree-bharati-3d-twin`. A second view at `/twin`: an interactive three-dimensional
+model of Bharati, reachable from the **3D Twin** switch in the header. Maitri stays on the console
+(your call — only Bharati's architectural set was available to trace).
+
+**The registry is the point, not the polygons.** `src/facility.ts` holds the 21-bay column grid,
+the H1–H4 elevation datums, the shell profile, 27 room volumes with bay spans and deck, and three
+service routes. `public/twin.js` generates the geometry from it. A room cannot be coloured without
+knowing what equipment is in it, so the 3D forced the asset registry the twin was missing.
+
+What shipped:
+
+- Extruded shell in two segments (deep end on V-columns, shallow end on stilts), four decks,
+  stairs at both ends, and the ground radome carrying the comms zone.
+- Rooms coloured live by alert severity, using the same rule and tokens as the console.
+- Click a room or its chip to select it; the rail shows deck, bay span, pillar, five live metrics.
+- **Explode decks**, **Services** (x-ray + flow), deck checkboxes, and **Reset view**.
+- Flow markers travel at a speed set by the real rate — generator load, crew on station, site
+  demand — so a stalled line reads as a stalled service.
+- Three.js r186 served from `node_modules` at `/vendor/three`. No CDN: the demo has to work with
+  no internet. WebGL missing → written fallback, console view carries the same information.
+
+**Fixed during the screenshot loop** (headless Chrome + SwiftShader, since the browser extension
+was down):
+
+- **The building was twice as wide as it should be.** `HALF_WIDTH_M` was 18 — a 2376 m² single-deck
+  footprint against Bharati's published ~2500 m² across three decks. Now 9 m, with the derivation
+  written into the constant.
+- **The model rendered flat white on white.** Root cause was blown-out lighting, not the material
+  colours: `MeshStandardMaterial` clips to white past ~1.0 total intensity. Hemi 0.72 / key 1.35 /
+  fill 0.22, and the ground is now a `ShadowMaterial` catcher so the CSS paper gradient shows
+  through instead of a second painted disc.
+- **The radome was clipped off the bottom of the frame.** Replaced hand-tuned camera numbers with
+  `fitView()`, which projects the model's real bounding box through the camera and solves the
+  push-back exactly. Geometry changes can no longer strand the camera.
+- **Rooms read as a pile of glass boxes.** They were 0.9 opacity; every room behind bled through.
+  Solid now — the translucent shell alone is what makes it a sectional view.
+- **Severity colours looked like mud on the model.** `--warn` / `--crit` are *text* tokens,
+  darkened for AA on white. Added `--warn-solid` / `--crit-solid` surface tokens; the legend and
+  the 3D scene both read them, so they cannot drift apart.
+- **The service network was two stubs and a pipe.** The routes in `facility.ts` were placeholders;
+  they now run fuel store → riser → generator hall, and melt plant → riser → wet rooms → galley.
+- **Legend and tool buttons overlapped on a phone.** One media query under 640px steps the legend
+  up a row and shortens the stage.
+
+**Verified:** typecheck clean, 23 tests pass (14 engine + 9 facility), all five routes 200, Explode
+and Services both driven headlessly over CDP and screenshotted, dashboard header link renders per
+station (`3D Twin` on Bharati, `3D Twin · Bharati` on Maitri), and **narrow viewport confirmed at
+420px** — `scrollWidth === innerWidth`, no overlap. That closes the one thing the console redesign
+could not check.
+
+**Not verified:** nothing on this branch is unverified, but none of it has been through a real GPU
+browser — SwiftShader renders the same pixels, it does not prove the frame rate.
+
 ## Pending (optional)
 
 - Swap to persistent MongoDB (one line in `src/db.ts`) if data must survive restarts.
 - Per-station detail page; richer historical charts than sparklines.
 - Prune readings (~1 MB/hour accumulates) before any long-running deployment.
-- Confirm the narrow-viewport layout on a real phone or a working devtools resize.
+- Run the 3D twin on a real GPU browser — SwiftShader proves the pixels, not the frame rate.
 - `CLAUDE.md` was drafted solo and still needs your review — it should have been filled in together.
 - Deck slide 1 still carries a team-name placeholder; slide 8's reference links need a check.
 

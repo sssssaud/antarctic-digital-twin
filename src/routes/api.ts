@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  getFacilityState,
   getStation,
   getStationTelemetry,
   health,
@@ -14,6 +15,7 @@ router.get('/stations', listStations);
 router.get('/stations/:code', getStation);
 router.get('/stations/:code/telemetry', getStationTelemetry);
 router.get('/alerts', listAlerts);
+router.get('/facility', getFacilityState);
 
 // Anything else under /api is a client mistake, not a page.
 router.use((_req, res) => {

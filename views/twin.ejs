@@ -1,0 +1,154 @@
+<%
+  const st = active.station;
+  const r  = active.reading;
+
+  const STATUS = {
+    nominal:  { label: 'NOMINAL',  cls: 'nominal'  },
+    degraded: { label: 'DEGRADED', cls: 'degraded' },
+    critical: { label: 'CRITICAL', cls: 'critical' },
+  };
+  const meta = STATUS[active.status];
+
+  const coord = (value, pos, neg) => Math.abs(value).toFixed(4) + '° ' + (value >= 0 ? pos : neg);
+
+  // Decks run top-down in the rail, the way you read an elevation.
+  const DECKS = ['roof', 'main', 'lower', 'under'];
+  const byLevel = (level) => facility.zones.filter((z) => z.level === level);
+
+  // Serialised into the page rather than fetched: the geometry never changes,
+  // so a round trip would buy nothing. `<` is escaped so no payload can close
+  // the script tag early.
+  const embed = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
+%>
+
+<header style="border-bottom:1px solid var(--hair-soft)">
+  <div class="mx-auto flex max-w-[1560px] flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4 sm:px-8">
+    <div>
+      <p style="font-size:12.5px;font-weight:800;letter-spacing:-.02em">Antarctic Digital Twin</p>
+      <p class="eyebrow" style="margin-top:2px">Maitri &amp; Bharati &middot; MoES / NCPOR &middot; PS 26060</p>
+    </div>
+
+    <nav class="seg" aria-label="View selection">
+      <a href="/?station=<%= st.code %>">Console</a>
+      <a href="/twin" aria-current="page">
+        <span class="sdot <%= meta.cls %>" aria-hidden="true"></span>3D Twin
+      </a>
+    </nav>
+
+    <div class="ml-auto flex items-baseline gap-5">
+      <span class="eyebrow">Live feed</span>
+      <span class="mono" id="utc-clock" style="font-size:12px;font-weight:700">--:--:-- UTC</span>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-[1560px] px-5 py-7 sm:px-8">
+  <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_330px] xl:items-start">
+
+    <!-- ── The model ───────────────────────────────────────────────────────── -->
+    <section class="bez">
+      <div class="core twin-stage" style="padding:0">
+        <div
+          id="viewport"
+          class="twin-viewport"
+          role="img"
+          aria-label="Interactive 3D model of Bharati station: four decks on stilts across twenty-one column bays. Rooms are listed with their live readings in the zone panel beside this model."
+        ></div>
+
+        <div class="twin-overlay twin-overlay-tl">
+          <p class="eyebrow">Bharati &middot; sectional twin</p>
+          <p class="twin-scale mono">21 bays &middot; H1&ndash;H4 &middot; traced from the architectural set</p>
+        </div>
+
+        <div class="twin-overlay twin-overlay-bl" aria-hidden="true">
+          <span class="twin-key"><i class="k-ok"></i>Nominal</span>
+          <span class="twin-key"><i class="k-warn"></i>Warning</span>
+          <span class="twin-key"><i class="k-crit"></i>Critical</span>
+        </div>
+
+        <div class="twin-overlay twin-overlay-br twin-tools">
+          <button type="button" class="tbtn" data-action="reset">Reset view</button>
+          <button type="button" class="tbtn" data-action="explode" aria-pressed="false">Explode decks</button>
+          <button type="button" class="tbtn" data-action="services" aria-pressed="false">Services</button>
+        </div>
+
+        <p class="twin-fallback" id="twin-fallback" hidden>
+          This browser could not start WebGL, so the model cannot be drawn. Every room and
+          its live readings are still listed in the zone panel, and the
+          <a href="/?station=<%= st.code %>" style="text-decoration:underline">console view</a>
+          carries the same telemetry.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Rail: identity, the selected room, and the whole room list ───────── -->
+    <div class="stg grid gap-5 xl:sticky xl:top-6">
+
+      <section class="bez raised">
+        <div class="core" style="gap:0;padding:20px 22px">
+          <p class="eyebrow">Station</p>
+          <h2 class="station-h" style="margin-top:7px"><%= st.name %></h2>
+          <p class="sub" style="margin-top:5px"><%= st.region %></p>
+          <p class="mono" style="margin-top:9px;font-size:10px;color:var(--ink4);line-height:1.7">
+            <%= coord(st.coordinates.latitude, 'N', 'S') %> &nbsp; <%= coord(st.coordinates.longitude, 'E', 'W') %><br>
+            <%= st.code %> &middot; commissioned <%= st.commissionedYear %>
+          </p>
+          <div style="margin-top:16px">
+            <span class="pill <%= meta.cls %>" id="twin-status">
+              <span class="dot" aria-hidden="true"></span><span data-role="status-label"><%= meta.label %></span>
+            </span>
+          </div>
+          <p class="sub mono" style="margin-top:10px;font-size:10px">
+            Last contact <span id="twin-contact"><%= helpers.stamp(active.recordedAt) %></span>
+          </p>
+        </div>
+      </section>
+
+      <!-- Populated by twin.js; the fallback text is what a room with no
+           selection shows, and what a screen reader hears before any click. -->
+      <section class="bez" aria-live="polite">
+        <div class="core" id="zone-panel" style="padding:18px 20px">
+          <p class="eyebrow">Selected zone</p>
+          <p class="sub" style="margin-top:8px">Pick a room in the model, or from the list below.</p>
+        </div>
+      </section>
+
+      <section class="bez">
+        <div class="core" style="padding:18px 20px;gap:0">
+          <p class="eyebrow">Decks &amp; rooms</p>
+          <% DECKS.forEach(function (level) { %>
+            <% const rooms = byLevel(level); if (!rooms.length) return; %>
+            <div class="deck-group">
+              <div class="deck-head">
+                <label class="deck-toggle">
+                  <input type="checkbox" data-deck="<%= level %>" checked>
+                  <span><%= facility.levels[level].label %></span>
+                </label>
+                <span class="mono deck-datum"><%= facility.levels[level].from.toFixed(1) %>&ndash;<%= facility.levels[level].to.toFixed(1) %> m</span>
+              </div>
+              <div class="deck-rooms">
+                <% rooms.forEach(function (zone) { %>
+                  <button type="button" class="zbtn" data-zone="<%= zone.id %>"><%= zone.name %></button>
+                <% }); %>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<script type="application/json" id="facility-model"><%- embed(facility) %></script>
+<script type="application/json" id="facility-state"><%- embed({ zones, status: active.status, reading: r, alerts: active.alerts }) %></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three/build/three.module.js",
+    "three/addons/": "/vendor/three/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="/twin.js?v=<%= assetVersion %>"></script>

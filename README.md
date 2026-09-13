@@ -194,6 +194,40 @@ tints are rendered server-side and must not be reconstructed in the browser.
 
 ---
 
+## The 3D twin — `/twin`
+
+Bharati gets a second view: an interactive three-dimensional model of the station, reachable from
+the **3D Twin** switch in the header.
+
+It is **generated, not modelled**. `src/facility.ts` holds the asset registry taken off the
+architectural set — the 21-bay column grid, the H1–H4 elevation datums, the shell profile, 27 room
+volumes with their bay spans and deck, and three service routes. `public/twin.js` extrudes the shell
+from that grid and places every room as a box at its real bay range. Move a bay range in
+`facility.ts` and the model moves with it, which is the only thing keeping it honest to the drawings.
+
+What it does:
+
+- **Rooms are coloured by live telemetry.** Each room carries a pillar and an alert code; when an
+  alert fires, that room turns ochre or red — the same severity rule and the same tokens the console
+  uses. The fuel store going amber and the electrical room going red is the alert list, in space.
+- **Click a room** (or its chip in the right rail) to select it; the panel shows the room's deck, bay
+  span, pillar, and the five live metrics for that pillar.
+- **Explode decks** separates the under-deck, lower, main and roof levels vertically, so the interior
+  is legible without hiding the shell.
+- **Services** x-rays the rooms and reveals the diesel feed, water main and supply air runs. The
+  markers travelling along each pipe move at a speed set by the *actual* rate — generator load,
+  crew on station, site demand — so a stalled line reads as a stalled service.
+- **Deck checkboxes** hide a whole level; **Reset view** re-frames the model from its own bounding
+  box rather than from hand-tuned camera numbers.
+
+Three.js r186 is served from `node_modules` at `/vendor/three`, not from a CDN — the demo has to
+work in a room with no internet. If WebGL is unavailable the canvas is replaced by a written
+fallback and the console view carries the same information.
+
+Maitri stays on the console view: only Bharati's architectural set was available to trace.
+
+---
+
 ## Presentation
 
 `presentation/deck.html` is the 8-slide pitch deck, following the SIH idea-submission

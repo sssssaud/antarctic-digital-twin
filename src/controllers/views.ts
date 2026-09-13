@@ -3,12 +3,15 @@
  * by the `view` local — one wrapper, any number of pages, no layout dependency.
  */
 import type { NextFunction, Request, Response } from 'express';
+import { facilityModel, zoneSeverities } from '../facility';
 import { getAllSnapshots, getHistory } from '../station-service';
 import { parseStationCode, sparklinePoints } from '../telemetry-engine';
 
 const SPARKLINE_POINTS = 48;
 /** Station shown when no ?station= is supplied. */
 const DEFAULT_STATION = 'MAITRI';
+/** The 3D twin is traced from Bharati's drawings; Maitri has no published set. */
+const MODELLED_STATION = 'BHARATI';
 
 /** Formatting helpers handed to the templates as locals. */
 export const helpers = {
@@ -33,6 +36,42 @@ export const helpers = {
     return date.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
   },
 };
+
+/**
+ * The 3D twin. The building's geometry is static, so it is serialised into the
+ * page once; only the live half is polled afterwards from `/api/facility`.
+ */
+export async function twin(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const snapshots = await getAllSnapshots();
+    const active = snapshots.find((s) => s.station.code === MODELLED_STATION);
+
+    if (!active) {
+      res.status(503).render('layout', {
+        view: 'error',
+        helpers,
+        title: 'Twin not ready',
+        status: 503,
+        heading: 'Bharati has not been seeded',
+        detail: 'The 3D twin is modelled on Bharati. Retry once the seeder has finished.',
+      });
+      return;
+    }
+
+    res.render('layout', {
+      view: 'twin',
+      helpers,
+      title: `${active.station.name} — 3D Twin`,
+      snapshots,
+      active,
+      facility: facilityModel(),
+      zones: zoneSeverities(active.alerts),
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
 export async function dashboard(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

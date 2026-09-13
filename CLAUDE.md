@@ -19,11 +19,16 @@ infrastructure, logistics) with ranked alerts — with **zero database setup**.
 - `src/controllers/` — `api.ts` (JSON + validation), `views.ts` (dashboard + format helpers).
 - `src/routes/` — router definitions for `/api` and `/`.
 - `src/server.ts` — boot sequence, error middleware, graceful shutdown.
-- `views/` — `layout.ejs` wrapper, `dashboard.ejs`, `error.ejs`, `partials/`.
+- `src/facility.ts` — Bharati's asset registry: column grid, elevation datums, 27 room volumes,
+  service routes. The 3D model is generated from this, so the drawings stay the source of truth.
+- `src/facility.test.ts` — `node:test` self-check for the registry (9 assertions).
+- `views/` — `layout.ejs` wrapper, `dashboard.ejs`, `twin.ejs`, `error.ejs`, `partials/`.
+- `public/console.css` — every token and component style; `public/twin.js` — the Three.js scene.
 
 ## Stack
 Node 20+ · TypeScript strict · Express 5 (not 4 — `qs` CVEs) · Mongoose 8 ·
-`mongodb-memory-server` 10 · EJS 6 · Tailwind via CDN.
+`mongodb-memory-server` 10 · EJS 6 · Tailwind via CDN · Three.js r186 served from
+`node_modules` (no CDN — the 3D twin has to work offline in the demo room).
 No GPU, no ML — the 6 GB VRAM ceiling is irrelevant here. `npm install` pulls a ~176 MB mongod
 binary once; runtime needs no network except the Tailwind CDN.
 

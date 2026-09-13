@@ -4,8 +4,12 @@
  */
 import type { NextFunction, Request, Response } from 'express';
 import { isDatabaseConnected } from '../db';
+import { zoneSeverities } from '../facility';
 import { getAllAlerts, getAllSnapshots, getHistory, getSnapshot } from '../station-service';
 import { STATION_CODES, parseStationCode, type StationCode } from '../telemetry-engine';
+
+/** The facility model is traced from Bharati's drawings; Maitri has no set. */
+const MODELLED_STATION: StationCode = 'BHARATI';
 
 const DEFAULT_HISTORY = 72;
 const MAX_HISTORY = 500;
@@ -79,6 +83,38 @@ export async function getStationTelemetry(req: Request, res: Response, next: Nex
     const limit = parseLimit(req.query.limit);
     const history = await getHistory(code, limit);
     res.json({ ok: true, stationCode: code, count: history.length, limit, data: history });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Live half of the 3D twin: which rooms are in trouble, plus the reading the
+ * room panels read from. The static geometry is not repeated here — the page
+ * already carries it, and re-sending 27 zones every five seconds is waste.
+ */
+export async function getFacilityState(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const snapshot = await getSnapshot(MODELLED_STATION);
+    if (!snapshot) {
+      res.status(503).json({ ok: false, error: `Station ${MODELLED_STATION} has not been seeded` });
+      return;
+    }
+    res.json({
+      ok: true,
+      data: {
+        stationCode: MODELLED_STATION,
+        status: snapshot.status,
+        recordedAt: snapshot.recordedAt,
+        reading: snapshot.reading,
+        alerts: snapshot.alerts,
+        zones: zoneSeverities(snapshot.alerts),
+      },
+    });
   } catch (error) {
     next(error);
   }

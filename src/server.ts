@@ -25,12 +25,27 @@ export function createApp(): express.Express {
 
   const publicDir = path.join(__dirname, '..', 'public');
 
-  // Cached hard, so the stylesheet URL carries its own mtime as a cache key —
-  // without it an edited console.css never reaches a browser that has one.
+  // Cached hard, so asset URLs carry their own mtime as a cache key — without
+  // it an edited console.css or twin.js never reaches a browser that has one.
   // ponytail: fonts ride the same immutable header; they are versioned by filename.
-  app.locals.assetVersion = String(Math.floor(fs.statSync(path.join(publicDir, 'console.css')).mtimeMs));
+  const versioned = ['console.css', 'twin.js'];
+  app.locals.assetVersion = String(
+    Math.floor(Math.max(...versioned.map((file) => fs.statSync(path.join(publicDir, file)).mtimeMs))),
+  );
 
   app.use(express.static(publicDir, { maxAge: '1y', immutable: true, index: false }));
+
+  // Three.js is served straight out of node_modules: the demo then needs no CDN
+  // and no 1 MB blob in git. It is ESM-only since r160, so the page resolves it
+  // through an import map rather than a <script src>.
+  app.use(
+    '/vendor/three',
+    express.static(path.join(__dirname, '..', 'node_modules', 'three'), {
+      maxAge: '1y',
+      immutable: true,
+      index: false,
+    }),
+  );
 
   app.use('/api', apiRouter);
   app.use('/', viewRouter);
