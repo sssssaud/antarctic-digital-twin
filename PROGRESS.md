@@ -213,9 +213,41 @@ demo story confirmed end to end — Maitri shows five alerts, *none of them abou
 above a +22 % demand and +14 % fuel divergence; Bharati shows 41 074 L of water and **no water
 alarm** above a +18 % water divergence.
 
-**Deliberately not decided alone:** whether a divergence should colour rooms in the 3D scene. If it
-reuses the alarm amber/red, the alarm-vs-divergence distinction is destroyed in the one view where it
-matters most. Data and room mapping are shipped; the visual channel is Saud's call.
+**The 3D visual channel — decided with Saud, same day.** Three options were put up: a dashed
+outline, a colourless slow pulse, or a fourth hue. Saud picked the dashed outline, which is the one
+that does not put divergence on the same scale as warning and critical.
+
+- A divergent room keeps its **nominal grey fill** and takes a dashed `--accent` outline
+  (`LineDashedMaterial` on the room's `EdgesGeometry`, added to the deck group so it rides the
+  exploded view). Amber and red stay exclusively severity's.
+- `divergenceZones()` sends the scene a zone id → metric map. It carries **no severity** on purpose:
+  handing the scene a severity is an invitation to paint it like an alarm.
+- The legend gained a dashed swatch, and clicking a flagged room quotes the engine's own sentence in
+  a dashed-outline block, so the scene, the rail and the console never become three accounts of the
+  same residual.
+
+**Found while verifying this: the 3D twin was silently dead in this checkout.** The canvas had been
+blank in every headless screenshot, which I had been writing off as a headless WebGL limitation. It
+was not — a minimal WebGL probe rendered fine, and CDP console output showed
+`/vendor/three/build/three.module.js` returning **404**. This working copy's `node_modules` predated
+the 3D-twin merge and had no `three` at all. `npm install` fixed it; the repo itself was always
+correct (`three` is in `dependencies`, and the installed 0.186.0 matches the lockfile exactly).
+The lesson is the cheap one: *a blank canvas is a bug report until proven otherwise.*
+
+**Verified for this change:** 30 tests pass (19 engine + 11 facility), typecheck clean, and the
+scene rendered over CDP with real WebGL 2.0 — dashed outlines visible on the water plant, toilets
+and bathrooms while the amber and red alarm rooms stay solid fills; clicking Bathrooms shows
+"Model divergence +19%" with the engine's sentence; and at 420 px the four-item legend still fits
+one row with `scrollWidth` 409 ≤ `innerWidth` 420.
+
+**Known, pre-existing, not fixed here:** Three.js r186 logs two deprecations — `THREE.Clock` (use
+`THREE.Timer`) and `PCFSoftShadowMap` removed, silently downgrading to `PCFShadowMap`, so shadows
+are slightly harder than the code asks for. Cosmetic; untouched because it is not what this change
+was about.
+
+**Still open:** the selected-room highlight glows the same accent teal the divergence dashes use.
+Different channels — a fill versus an outline — and only one room is ever selected, but if it reads
+ambiguously in a live demo the selection glow is the one to change, not the dashes.
 
 ## Pending (optional)
 
@@ -231,7 +263,6 @@ matters most. Data and room mapping are shipped; the visual channel is Saud's ca
   above 18 °C?"* The physics for this already exists in `modelDemandKw`.
 - **Phase 3 — forecast / predictive maintenance:** projected diesel exhaustion against the resupply
   window, driven off the same divergence-corrected burn rate.
-- Decide the 3D visual channel for divergence (see above).
 
 ## Blockers
 

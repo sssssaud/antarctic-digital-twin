@@ -156,6 +156,33 @@ function outline(geometry, opacity = 0.5) {
   return line;
 }
 
+/**
+ * The divergence marker: a dashed outline, never a fill colour.
+ *
+ * A room whose model no longer fits keeps its nominal grey on purpose. Paint it
+ * amber and it becomes indistinguishable from a room that is genuinely in
+ * trouble — and the difference between "this crossed a threshold" and "this
+ * stopped matching physics while every gauge still reads normal" is the entire
+ * reason this is a twin and not a dashboard. Dashes carry it in a channel the
+ * severity colours do not use, so the two can never be confused.
+ *
+ * ponytail: accent is an existing token, not a fourth severity hue. Adding one
+ * would put divergence on the same scale as warning and critical, which is the
+ * exact claim it is not making.
+ */
+function divergenceOutline(geometry) {
+  const line = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geometry, 25),
+    new THREE.LineDashedMaterial({
+      color: COLOR.accent, dashSize: 0.24, gapSize: 0.17, transparent: true, opacity: 0.92,
+    }),
+  );
+  line.computeLineDistances(); // dashes do not appear without this
+  line.raycast = () => {};
+  line.visible = false;
+  return line;
+}
+
 /* ── The shell: two extruded segments, stepped like the section ───────────── */
 const building = new THREE.Group();
 scene.add(building);
@@ -282,7 +309,12 @@ for (const zone of MODEL.zones) {
   edges.position.copy(mesh.position);
   group.add(edges);
 
-  zoneMeshes.set(zone.id, { mesh, material, base: material.color.clone() });
+  // Added to the deck group, not the scene, so it rides the exploded view.
+  const dashed = divergenceOutline(geometry);
+  dashed.position.copy(mesh.position);
+  group.add(dashed);
+
+  zoneMeshes.set(zone.id, { mesh, material, dashed, base: material.color.clone() });
 }
 
 // The radome stands apart from the building in every photograph; it carries the
@@ -422,8 +454,10 @@ host.addEventListener('keydown', (event) => {
 /* ── Painting zones from live severity ────────────────────────────────────── */
 function paintZones() {
   const severities = STATE.zones ?? {};
+  const flagged = STATE.divergenceZones ?? {};
   for (const [id, entry] of zoneMeshes) {
     const severity = severities[id];
+    entry.dashed.visible = Boolean(flagged[id]);
     const target = severity === 'critical' ? COLOR.crit : severity === 'warning' ? COLOR.warn : entry.base;
     entry.material.color.copy(target);
     entry.material.emissive.copy(severity ? target : new THREE.Color(0x000000));
@@ -500,12 +534,25 @@ function renderZonePanel() {
       ? `<div class="zp-alert" data-sev="${escapeHtml(severity)}">${escapeHtml(related[0].message)}</div>`
       : '';
 
+  // The dashes say a room stopped matching its model; this says by how much.
+  // The sentence comes straight off the engine so the room, the rail and the
+  // console are never three different accounts of the same residual.
+  const metric = (STATE.divergenceZones ?? {})[zone.id];
+  const divergence = metric && (STATE.divergences ?? []).find((d) => d.metric === metric);
+  const divergenceBlock = divergence
+    ? `<div class="zp-dvg">
+        <span class="zp-dvg-h">Model divergence
+          ${divergence.ratio > 0 ? '+' : '&minus;'}${Math.round(Math.abs(divergence.ratio) * 100)}%</span>
+        ${escapeHtml(divergence.message)}
+      </div>`
+    : '';
+
   panel.innerHTML = `
     <p class="eyebrow">Selected zone</p>
     <div class="zp-head"><span class="zp-name">${escapeHtml(zone.name)}</span></div>
     <p class="zp-meta mono">${escapeHtml(MODEL.levels[zone.level].label)} &middot; bays ${zone.bays[0]}&ndash;${zone.bays[1]} &middot; ${escapeHtml(zone.pillar)}</p>
     <div style="margin-top:12px;border-top:1px solid var(--hair-soft);padding-top:4px">${rows}</div>
-    ${alertBlock}`;
+    ${alertBlock}${divergenceBlock}`;
 }
 
 for (const button of document.querySelectorAll('.zbtn')) {

@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import {
   ALERT_ZONES,
   DIVERGENCE_ZONES,
+  divergenceZones,
   BAY_M,
   DATUM,
   LEVELS,
@@ -72,6 +73,21 @@ test('ALERT_ZONES never points at a zone that does not exist', () => {
       assert.ok(zoneById(id), `alert ${code} points at unknown zone "${id}"`);
     }
   }
+});
+
+test('divergenceZones maps residuals to rooms without inventing a severity', () => {
+  assert.deepEqual(divergenceZones([]), {}, 'no divergence must light no room');
+
+  const flagged = divergenceZones([{ metric: 'infrastructure.waterReserveL' }]);
+  assert.deepEqual(Object.keys(flagged).sort(), [...DIVERGENCE_ZONES['infrastructure.waterReserveL']].sort());
+  for (const metric of Object.values(flagged)) {
+    assert.equal(metric, 'infrastructure.waterReserveL', 'the room must point back at its own metric');
+  }
+
+  // Two metrics sharing a room must not erase each other; first one holds it.
+  const shared = divergenceZones([{ metric: 'energy.demandKw' }, { metric: 'energy.dieselLitres' }]);
+  assert.equal(shared['electrical'], 'energy.demandKw', JSON.stringify(shared));
+  assert.ok(shared['fuel-store'] && shared['plant-room'], JSON.stringify(shared));
 });
 
 test('DIVERGENCE_ZONES sends every metric to real rooms', () => {

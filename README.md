@@ -110,6 +110,12 @@ kept out of station `status`. An alert says the station is in trouble now; a div
 heading there while every gauge still reads normal. Folding one into the other would throw away the
 only signal the twin adds.
 
+In the 3D twin the same rule decides the pixels. Severity owns amber and red; a **divergent room
+keeps its nominal grey and takes a dashed accent outline instead** — a channel the severity colours
+do not use, so the two can never be read as the same claim. Clicking the room quotes the residual
+back with the sentence the engine wrote. The rooms come from `DIVERGENCE_ZONES`: not *where is the
+alarm ringing* but *where would an engineer start looking, given that nothing is ringing at all.*
+
 ---
 
 ## The four pillars

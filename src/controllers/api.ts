@@ -4,7 +4,7 @@
  */
 import type { NextFunction, Request, Response } from 'express';
 import { isDatabaseConnected } from '../db';
-import { zoneSeverities } from '../facility';
+import { divergenceZones, zoneSeverities } from '../facility';
 import { getAllAlerts, getAllSnapshots, getHistory, getSnapshot } from '../station-service';
 import { STATION_CODES, parseStationCode, type StationCode } from '../telemetry-engine';
 
@@ -114,6 +114,7 @@ export async function getFacilityState(
         alerts: snapshot.alerts,
         divergences: snapshot.divergences,
         zones: zoneSeverities(snapshot.alerts),
+        divergenceZones: divergenceZones(snapshot.divergences),
       },
     });
   } catch (error) {

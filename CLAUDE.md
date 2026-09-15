@@ -23,7 +23,7 @@ infrastructure, logistics) with ranked alerts — with **zero database setup**.
 - `src/server.ts` — boot sequence, error middleware, graceful shutdown.
 - `src/facility.ts` — Bharati's asset registry: column grid, elevation datums, 27 room volumes,
   service routes. The 3D model is generated from this, so the drawings stay the source of truth.
-- `src/facility.test.ts` — `node:test` self-check for the registry (9 assertions).
+- `src/facility.test.ts` — `node:test` self-check for the registry (11 assertions).
 - `views/` — `layout.ejs` wrapper, `dashboard.ejs`, `twin.ejs`, `error.ejs`, `partials/`,
   and `_divergence.ejs`, the one divergence list both pages include.
 - `public/console.css` — every token and component style; `public/twin.js` — the Three.js scene.
@@ -48,6 +48,10 @@ binary once; runtime needs no network except the Tailwind CDN.
 - **A divergence is not an alert and must never be folded into `status`.** An alert says the
   station is in trouble now; a divergence says it is heading there while every gauge still reads
   normal. Merging them throws away the only signal the twin adds over a threshold console.
+- **Divergence gets its own visual channel everywhere: a dashed accent outline, never a fill.**
+  Severity owns amber and red; a divergent room keeps its nominal grey and takes dashes. The 3D
+  scene, the legend swatch and the zone panel all say it the same way, so the distinction survives
+  in the one view where colour is the loudest thing on screen.
 - **Hidden plant state (`PlantState`) must never reach a `Reading`.** `toReading()` copies only the
   four pillars, which is what makes it structurally impossible to hand the twin its own answer.
 - Scenario shaping in the seeder must interpolate toward **absolute** targets, never relative ones —
@@ -59,13 +63,11 @@ binary once; runtime needs no network except the Tailwind CDN.
 ## Current status
 - Done: all four phases of the generator prompt — setup, DB + models, seeder/controllers/routes/server,
   EJS + Tailwind dashboard — plus the console redesign, the Bharati 3D twin, and the **divergence
-  engine**. 29 tests pass, `npm audit` clean, dev and production builds both verified serving, both
-  station views checked in a browser.
+  engine**, surfaced in the 3D scene as a dashed outline. 30 tests pass, `npm audit` clean, dev and
+  production builds both verified serving, both station views checked in a browser.
 - Pending: nothing required. Optional next steps — persistent MongoDB swap, per-station detail page,
   historical charts beyond sparklines, prune old readings, and the two roadmap phases below.
 - Roadmap: **Phase 2** what-if simulation (*"generator 2 fails at −40 °C — how long does the habitat
   hold above 18 °C?"*); **Phase 3** forecast / predictive maintenance (projected diesel exhaustion
   against the resupply window).
-- Open question for Saud: should a divergence colour rooms in the 3D twin, and through what visual
-  channel? Reusing the alarm amber/red would erase the distinction the whole twin rests on.
 - Blockers: none.

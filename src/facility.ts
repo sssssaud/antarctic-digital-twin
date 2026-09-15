@@ -479,6 +479,27 @@ export function zoneSeverities(
   return out;
 }
 
+/**
+ * Zone id -> the metric that flagged it, so the scene can mark the room and the
+ * panel can quote the right sentence without re-deriving anything.
+ *
+ * Severity is deliberately absent. `zoneSeverities` carries it because an alarm
+ * has degrees of trouble; a divergence has only one thing to say — this room no
+ * longer matches its model — and handing the scene a severity would invite it to
+ * paint the same amber and red an alarm paints.
+ */
+export function divergenceZones(
+  list: { metric: DivergenceMetric }[],
+): Record<string, DivergenceMetric> {
+  const out: Record<string, DivergenceMetric> = {};
+  for (const divergence of list) {
+    for (const id of DIVERGENCE_ZONES[divergence.metric] ?? []) {
+      out[id] ??= divergence.metric;
+    }
+  }
+  return out;
+}
+
 /** Everything the browser needs to draw the building, in one payload. */
 export function facilityModel() {
   return {
