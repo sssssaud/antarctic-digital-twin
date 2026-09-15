@@ -112,6 +112,7 @@ export async function getFacilityState(
         recordedAt: snapshot.recordedAt,
         reading: snapshot.reading,
         alerts: snapshot.alerts,
+        divergences: snapshot.divergences,
         zones: zoneSeverities(snapshot.alerts),
       },
     });

@@ -20,3 +20,6 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Claude Code worktree storage, not part of the project.
+.claude/worktrees/

@@ -124,6 +124,29 @@
           </div></div>
         <% } %>
       </section>
+
+      <!-- ── Model divergence ────────────────────────────────────────────────
+           The half of the job a threshold console cannot do. Every figure here
+           is inside its safe band and still does not match the model, which is
+           the earliest moment a fault can be seen at all. -->
+      <section aria-live="polite" aria-label="Model divergence" class="grid gap-4">
+        <div class="bez"><div class="core" style="padding:14px 16px;gap:2px">
+          <p class="eyebrow">Model divergence &middot; 12 h window</p>
+          <% if (active.divergences.length === 0) { %>
+            <p class="sub" style="margin-top:7px">
+              Every modelled quantity is tracking its prediction. Site demand, fuel burn and water
+              draw all match what this weather and this crew should produce.
+            </p>
+          <% } else { %>
+            <p class="sub" style="margin-top:5px">
+              Nothing below has crossed a threshold. These are the gaps between what the station
+              reports and what its physics predicts for the same weather, crew and generator
+              load &mdash; the earliest evidence that something is wrong.
+            </p>
+            <%- include('_divergence', { divergences: active.divergences, helpers: helpers }) %>
+          <% } %>
+        </div></div>
+      </section>
     </div>
 
     <!-- ── Right: the four pillars ─────────────────────────────────────────── -->
@@ -267,7 +290,14 @@
 <script>
   (function () {
     var CODE = <%- JSON.stringify(st.code) %>;
-    var signature = <%- JSON.stringify(active.alerts.map(function (a) { return a.code; }).join('|')) %>;
+    function signatureOf(snapshot) {
+      return (snapshot.alerts || []).map(function (a) { return a.code; }).join('|')
+        + '~' + (snapshot.divergences || []).map(function (d) { return d.metric + ':' + d.severity; }).join('|');
+    }
+    var signature = <%- JSON.stringify(
+      active.alerts.map(function (a) { return a.code; }).join('|')
+      + '~' + active.divergences.map(function (d) { return d.metric + ':' + d.severity; }).join('|')
+    ) %>;
 
     function tickClock() {
       var el = document.getElementById('utc-clock');
@@ -313,10 +343,9 @@
           stamp.textContent = String(snapshot.recordedAt).replace('T', ' ').slice(0, 19) + ' UTC';
         }
 
-        // Alert copy and severity tints are rendered server-side. If the alert set
-        // itself changed, re-render the page rather than patching it here.
-        var next = (snapshot.alerts || []).map(function (a) { return a.code; }).join('|');
-        if (next !== signature) window.location.reload();
+        // Alert and divergence copy is rendered server-side. If either set itself
+        // changed, re-render the page rather than patching it here.
+        if (signatureOf(snapshot) !== signature) window.location.reload();
       } catch (error) {
         // A dropped poll is expected on a bad link. Keep the last good values on screen.
         console.warn('[poll]', error);

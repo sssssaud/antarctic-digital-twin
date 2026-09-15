@@ -246,6 +246,44 @@ export function baselineReading(
   return { environment, energy, infrastructure, logistics };
 }
 
+// --- The healthy-plant model -------------------------------------------------
+// One copy of the station's physics, shared by the simulator and the divergence
+// engine. `nextReading` runs these numbers forward with noise and wear;
+// `expectedReading` runs the same numbers clean. If the two ever stop reading
+// from here, the divergence stops meaning anything and becomes decoration.
+
+/** Diesel consumed per kWh the generator actually produces. */
+const DIESEL_L_PER_KWH = 0.28;
+/** Potable water drawn per person per day. */
+const CREW_WATER_L_PER_DAY = 55;
+/** Melt plant output, as a fraction of tank capacity per hour, while HVAC is nominal. */
+const MELT_FRACTION_PER_H = 0.0016;
+
+/** Heat + power a healthy station should draw at this air temperature, before noise. */
+function modelDemandKw(profile: StationProfile, temperatureC: number): number {
+  // Colder air pushes heating demand up.
+  const coldLoad = clamp((-temperatureC - 10) / 30, 0, 1);
+  return clamp(
+    profile.generatorCapacityKw * (0.38 + coldLoad * 0.34),
+    profile.generatorCapacityKw * 0.2,
+    profile.generatorCapacityKw * 0.98,
+  );
+}
+
+/**
+ * Hidden degradation. The simulator is the only thing that ever sees this — the
+ * divergence engine has to infer it from the readings, which is the whole point.
+ * Never put it in a `Reading`, or the API would hand the twin its own answer.
+ */
+export interface PlantState {
+  /** Fouled exchangers: more kW to hold the same indoor temperature, worse fuel burn. */
+  foulingPct: number;
+  /** Water leaving the loop without anyone drinking it, litres per hour. */
+  leakLph: number;
+}
+
+export const HEALTHY_PLANT: PlantState = { foulingPct: 0, leakLph: 0 };
+
 /**
  * Advance the twin by one tick. Pure: same previous reading + same rng => same result.
  * `elapsedHours` scales the slow-moving consumables so seeding a 12 h history and
@@ -257,6 +295,7 @@ export function nextReading(
   at: Date,
   rng: Rng = Math.random,
   elapsedHours = 1 / 360,
+  plant: PlantState = HEALTHY_PLANT,
 ): Reading {
   const season = seasonalTempC(profile, at);
   // Pull gently back toward the seasonal mean so the walk cannot drift forever.
@@ -281,11 +320,10 @@ export function nextReading(
     blizzard,
   };
 
-  // Colder air and higher wind push heating demand up.
-  const coldLoad = clamp((-temperatureC - 10) / 30, 0, 1);
+  // Fouling means more kW for the same weather — the excess is what gives it away.
   const demandKw = round(
     clamp(
-      profile.generatorCapacityKw * (0.38 + coldLoad * 0.34) + (rng() * 2 - 1) * 6,
+      modelDemandKw(profile, temperatureC) * (1 + plant.foulingPct) + (rng() * 2 - 1) * 6,
       profile.generatorCapacityKw * 0.2,
       profile.generatorCapacityKw * 0.98,
     ),
@@ -302,8 +340,8 @@ export function nextReading(
     1,
   );
   const generatorLoadKw = round(clamp(demandKw - solarOutputKw - windOutputKw, 0, profile.generatorCapacityKw), 1);
-  // Diesel burn ~0.28 L per kWh generated.
-  const burnedL = generatorLoadKw * elapsedHours * 0.28;
+  // Diesel burn ~0.28 L per kWh generated, degraded further by a fouled plant.
+  const burnedL = generatorLoadKw * elapsedHours * DIESEL_L_PER_KWH * (1 + plant.foulingPct * 0.6);
   const dieselLitres = Math.max(0, Math.round(prev.energy.dieselLitres - burnedL));
   const surplusKw = demandKw - generatorLoadKw - solarOutputKw - windOutputKw;
 
@@ -337,8 +375,10 @@ export function nextReading(
     ),
     waterReserveL: Math.max(
       0,
-      Math.round(prev.infrastructure.waterReserveL - prev.logistics.crewOnStation * 55 * elapsedHours / 24
-        + (hvacStatus === 'nominal' ? profile.waterCapacityL * 0.0016 * elapsedHours : 0)),
+      Math.round(prev.infrastructure.waterReserveL
+        - prev.logistics.crewOnStation * CREW_WATER_L_PER_DAY * elapsedHours / 24
+        + (hvacStatus === 'nominal' ? profile.waterCapacityL * MELT_FRACTION_PER_H * elapsedHours : 0)
+        - plant.leakLph * elapsedHours),
     ),
     waterCapacityL: profile.waterCapacityL,
     structuralIntegrityPct: round(
@@ -503,6 +543,188 @@ export function deriveStatus(alerts: Alert[]): StationStatus {
   if (alerts.some((a) => a.severity === 'critical')) return 'critical';
   if (alerts.some((a) => a.severity === 'warning')) return 'degraded';
   return 'nominal';
+}
+
+// --- Divergence --------------------------------------------------------------
+// The difference between a dashboard and a twin. A threshold alarm fires once a
+// number leaves its safe band. A twin notices when a number stops matching the
+// model *while still inside* that band: the generator is fine, the tank is fine,
+// but the station is burning more fuel than this weather can explain. Nothing is
+// alarming yet, and something is already wrong. That gap is the signal.
+
+/** A reading with its clock attached, which is what the store hands back. */
+export interface TimedReading extends Reading {
+  recordedAt: Date;
+}
+
+/** What a healthy plant should be reading, given the weather and crew measured. */
+export interface Expected {
+  demandKw: number;
+  dieselLitres: number;
+  waterReserveL: number;
+  /** Potable water the crew on station should have drawn over the step. */
+  crewDrawL: number;
+}
+
+export type DivergenceMetric =
+  | 'energy.demandKw'
+  | 'energy.dieselLitres'
+  | 'infrastructure.waterReserveL';
+
+export interface Divergence {
+  metric: DivergenceMetric;
+  pillar: Pillar;
+  label: string;
+  unit: string;
+  /** Model and measurement over the window, in the metric's own unit. */
+  expected: number;
+  actual: number;
+  /** Residual as a share of the model. Positive means more than predicted. */
+  ratio: number;
+  severity: Severity;
+  message: string;
+}
+
+/**
+ * Run the healthy model one step forward from `prev`, using only what the
+ * station actually measured in `now` — weather, generator load, crew, HVAC state.
+ * It is deliberately blind to `PlantState`: the gap it leaves is the diagnosis.
+ */
+export function expectedReading(
+  prev: Reading,
+  now: Reading,
+  profile: StationProfile,
+  elapsedHours: number,
+): Expected {
+  // Crew draw is known, and the melt plant runs whenever HVAC is nominal.
+  const crewDrawL = (prev.logistics.crewOnStation * CREW_WATER_L_PER_DAY * elapsedHours) / 24;
+  const meltL =
+    now.infrastructure.hvacStatus === 'nominal'
+      ? profile.waterCapacityL * MELT_FRACTION_PER_H * elapsedHours
+      : 0;
+  return {
+    demandKw: round(modelDemandKw(profile, now.environment.temperatureC), 1),
+    // Generator load is measured, so only the burn rate per kWh is modelled here.
+    dieselLitres:
+      prev.energy.dieselLitres - now.energy.generatorLoadKw * elapsedHours * DIESEL_L_PER_KWH,
+    waterReserveL: prev.infrastructure.waterReserveL - crewDrawL + meltL,
+    crewDrawL,
+  };
+}
+
+/** Residual bands, as a share of what the model predicted. */
+const DIVERGENCE_BAND = { warning: 0.12, critical: 0.3 };
+
+function gradeResidual(ratio: number): Severity | null {
+  const size = Math.abs(ratio);
+  if (size >= DIVERGENCE_BAND.critical) return 'critical';
+  if (size >= DIVERGENCE_BAND.warning) return 'warning';
+  return null;
+}
+
+/**
+ * Compare a window of readings against the model, one consecutive pair at a time.
+ *
+ * Stocks (fuel, water) are judged by how far they *moved* across the window, never
+ * by their level: a 300 L leak is invisible against a 65 000 L tank but glaring
+ * against the 900 L the crew was supposed to drink. Rates (demand) are averaged,
+ * so one noisy tick cannot raise an alarm by itself.
+ */
+export function divergences(
+  history: readonly TimedReading[],
+  profile: StationProfile,
+): Divergence[] {
+  let pairs = 0;
+  let demandExpected = 0;
+  let demandActual = 0;
+  let dieselModelledDrop = 0;
+  let dieselMeasuredDrop = 0;
+  let waterModelledDrop = 0;
+  let waterMeasuredDrop = 0;
+  let waterCrewDraw = 0;
+
+  for (let i = 1; i < history.length; i += 1) {
+    const prev = history[i - 1];
+    const now = history[i];
+    if (!prev || !now) continue;
+    const elapsedHours = (now.recordedAt.getTime() - prev.recordedAt.getTime()) / 3_600_000;
+    // Duplicate rows and clock skew would divide by zero or run the model backwards.
+    if (!(elapsedHours > 0)) continue;
+
+    const model = expectedReading(prev, now, profile, elapsedHours);
+    demandExpected += model.demandKw;
+    demandActual += now.energy.demandKw;
+    dieselModelledDrop += prev.energy.dieselLitres - model.dieselLitres;
+    dieselMeasuredDrop += prev.energy.dieselLitres - now.energy.dieselLitres;
+    waterModelledDrop += prev.infrastructure.waterReserveL - model.waterReserveL;
+    waterMeasuredDrop += prev.infrastructure.waterReserveL - now.infrastructure.waterReserveL;
+    waterCrewDraw += model.crewDrawL;
+    pairs += 1;
+  }
+  if (pairs === 0) return [];
+
+  const found: Divergence[] = [];
+  const consider = (
+    metric: DivergenceMetric,
+    pillar: Pillar,
+    label: string,
+    unit: string,
+    expected: number,
+    actual: number,
+    floor: number,
+    message: (pct: number, over: boolean) => string,
+  ): void => {
+    // Below the floor the model predicts almost no movement, so the ratio would be
+    // pure rounding noise. Stay quiet rather than invent a fault.
+    if (Math.abs(expected) < floor) return;
+    // Round once, then report and phrase from the same number. Rounding the
+    // stored ratio separately from the one in the sentence puts "+14%" next to
+    // "13% more fuel" on the same row.
+    const ratio = round((actual - expected) / Math.abs(expected), 3);
+    const severity = gradeResidual(ratio);
+    if (!severity) return;
+    found.push({
+      metric,
+      pillar,
+      label,
+      unit,
+      expected: round(expected, 1),
+      actual: round(actual, 1),
+      ratio,
+      severity,
+      message: message(Math.round(Math.abs(ratio) * 100), ratio > 0),
+    });
+  };
+
+  consider(
+    'energy.demandKw', 'energy', 'Site demand', 'kW',
+    demandExpected / pairs, demandActual / pairs, 1,
+    (pct, over) => over
+      ? `Drawing ${pct}% more power than this air temperature explains — fouled heat exchangers or a breach in the envelope.`
+      : `Drawing ${pct}% less power than this air temperature explains — a load is offline, or the meter is under-reading.`,
+  );
+  consider(
+    'energy.dieselLitres', 'energy', 'Fuel burn', 'L',
+    dieselModelledDrop, dieselMeasuredDrop, 5,
+    (pct, over) => over
+      ? `Burning ${pct}% more fuel than the generator load accounts for — injectors, or a transfer line losing fuel.`
+      : `Burning ${pct}% less fuel than the generator load accounts for — check the tank gauge before trusting it.`,
+  );
+  // Water that left the loop without anyone drinking it. The melt plant very
+  // nearly cancels the crew draw, so the *net* change crosses zero and a ratio
+  // taken against it is an artifact of that near-cancellation, not a measurement.
+  // Against the crew draw the same litres read as what they are: unaccounted flow.
+  const unaccountedL = waterMeasuredDrop - waterModelledDrop;
+  consider(
+    'infrastructure.waterReserveL', 'infrastructure', 'Water draw', 'L',
+    waterCrewDraw, waterCrewDraw + unaccountedL, 20,
+    (pct, over) => over
+      ? `${pct}% more water is leaving the loop than the crew can account for — a leak downstream of the melt plant.`
+      : `${pct}% less water is leaving the loop than the crew can account for — the melt plant is over-producing, or the level sensor is stuck.`,
+  );
+
+  const rank: Record<Severity, number> = { critical: 0, warning: 1 };
+  return found.sort((a, b) => rank[a.severity] - rank[b.severity]);
 }
 
 /**

@@ -104,6 +104,21 @@
         </div>
       </section>
 
+      <% if (active.divergences.length) { %>
+        <section class="bez" aria-label="Model divergence">
+          <div class="core" style="padding:18px 20px;gap:0">
+            <p class="eyebrow">Model divergence &middot; 12 h</p>
+            <p class="sub" style="margin-top:7px">
+              Nothing here has crossed a threshold. These are the places the station has
+              stopped matching its model, and the rooms to walk to.
+            </p>
+            <%- include('_divergence', {
+              divergences: active.divergences, helpers: helpers, rooms: divergenceRooms,
+            }) %>
+          </div>
+        </section>
+      <% } %>
+
       <!-- Populated by twin.js; the fallback text is what a room with no
            selection shows, and what a screen reader hears before any click. -->
       <section class="bez" aria-live="polite">

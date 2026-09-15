@@ -10,7 +10,7 @@
  * and the BIM services model. It is *proportional*, not surveyed: bay and
  * storey spacing come from the drawings' own grid, scaled to plausible metres.
  */
-import type { Pillar, Severity } from './telemetry-engine';
+import type { DivergenceMetric, Pillar, Severity } from './telemetry-engine';
 
 /** Structural column lines 1..21 running the length of the building. */
 export const BAYS = 21;
@@ -376,6 +376,19 @@ export const ALERT_ZONES: Record<string, string[]> = {
   LOG_FOOD_LOW: ['cold-store-a', 'cold-store-b'],
   LOG_SUPPLY_GAP: ['storage'],
   LOG_MEDICAL_LOW: ['storage'],
+};
+
+/**
+ * Which rooms a divergence points at. Same shape as `ALERT_ZONES`, answering a
+ * different question: not "where is the alarm ringing" but "where would an
+ * engineer start looking", given that nothing is ringing at all.
+ */
+export const DIVERGENCE_ZONES: Record<DivergenceMetric, string[]> = {
+  // Heat that the weather does not explain is made in the plant room and paid
+  // for at the switchboard.
+  'energy.demandKw': ['plant-room', 'electrical'],
+  'energy.dieselLitres': ['fuel-store', 'electrical'],
+  'infrastructure.waterReserveL': ['water-plant', 'toilet', 'bathroom'],
 };
 
 /** A point on a service run: bay along the grid, metres up, metres off centre. */

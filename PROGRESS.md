@@ -2,7 +2,7 @@
 
 Session save-file. Re-read at session start; update + commit after each meaningful step.
 
-## Status: complete and verified — 2026-09-12
+## Status: complete and verified — 2026-09-15 (divergence engine shipped)
 
 Built from `SIH_26060_Claude_Generator.zip`, which contained a generator prompt (not code)
 specifying a fixed stack and four execution phases.
@@ -163,6 +163,60 @@ could not check.
 **Not verified:** nothing on this branch is unverified, but none of it has been through a real GPU
 browser — SwiftShader renders the same pixels, it does not prove the frame rate.
 
+## Divergence engine — 2026-09-15
+
+The gap this closes: a threshold alarm fires when a number leaves its safe band. A **twin** carries a
+model of what the station should be doing, so it can say a number has stopped matching physics
+**while it is still inside that band**. Without this the project was a very good dashboard.
+
+**What was built**
+
+- `PlantState` (`foulingPct`, `leakLph`) threaded through `nextReading`. It never enters a `Reading`,
+  so no threshold rule can ever fire on it — and no DB schema changed, because `toReading()` copies
+  only the four pillars and the seeder is the sole caller of `nextReading`.
+- `expectedReading()` re-derives each step from the same shared constants the simulator uses —
+  `modelDemandKw()`, `DIESEL_L_PER_KWH`, `CREW_WATER_L_PER_DAY`, `MELT_FRACTION_PER_H`. If those ever
+  stop being one copy, divergence becomes decoration.
+- `divergences()` replays a **12 h window** and reports residuals on three metrics: site demand,
+  fuel burn, water draw. Bands: 12 % warning, 30 % critical.
+- Hidden faults in the seeder: Maitri 24 % fouling, Bharati a 16 L/h seep. Both invisible to alarms.
+- Surfaced in three places from **one** partial (`views/_divergence.ejs`): the console, the 3D twin
+  rail (with the rooms to walk to, via `DIVERGENCE_ZONES`), and `/api/facility` + station snapshots.
+
+**Three things that took measuring, not guessing**
+
+- **The water residual was lying.** Bharati read "76.6 % falling faster" while the reserve was
+  actually *rising*. Cause: normalising against the **net** tank change, which straddles zero because
+  melt output nearly cancels crew draw — so the ratio was an artifact of that near-cancellation.
+  Fixed by normalising against gross modelled crew draw. Now reads a defensible +18 %.
+- **The window had to be time-based, not row-based.** The live simulator ticks every ~5 s, so the
+  newest 72 rows can span six minutes, over which no leak moves measurable water. Proved with 144
+  live ticks: residuals held stable at 19 % / 23.6 % / 12.2 %.
+- **The storm scenario does not fake a divergence.** Measured rather than argued: under the storm
+  front the raw residuals are demand −0.5 %, fuel −2.1 %, water +1.8 %, against a 12 % band.
+
+**Bugs found and fixed**
+
+- Chip read `+14%` beside a message saying `13% more fuel` — the ratio was rounded for storage but
+  the sentence was phrased from the unrounded value. Now rounded once, reported and phrased from the
+  same number, with a regression assertion.
+- A miscalibrated test assertion, not an engine bug: 22 % fouling gives a 22 % demand and 13.2 % fuel
+  residual, both under the 30 % critical band. Split into a warning test at 0.22 and an ordering test
+  at 0.35.
+- The 3D twin's poller would have left the server-rendered divergence card stale forever. It now
+  compares a `metric:severity` signature against the DOM and reloads, the same contract the console
+  uses. Ratios are excluded on purpose — they drift every tick and would reload forever.
+
+**Verified:** typecheck clean, **29 tests pass** (19 engine + 10 facility), console and twin both
+screenshotted at 1280 px, DOM and API signatures confirmed identical so no reload loop fires, and the
+demo story confirmed end to end — Maitri shows five alerts, *none of them about energy*, directly
+above a +22 % demand and +14 % fuel divergence; Bharati shows 41 074 L of water and **no water
+alarm** above a +18 % water divergence.
+
+**Deliberately not decided alone:** whether a divergence should colour rooms in the 3D scene. If it
+reuses the alarm amber/red, the alarm-vs-divergence distinction is destroyed in the one view where it
+matters most. Data and room mapping are shipped; the visual channel is Saud's call.
+
 ## Pending (optional)
 
 - Swap to persistent MongoDB (one line in `src/db.ts`) if data must survive restarts.
@@ -171,6 +225,13 @@ browser — SwiftShader renders the same pixels, it does not prove the frame rat
 - Run the 3D twin on a real GPU browser — SwiftShader proves the pixels, not the frame rate.
 - `CLAUDE.md` was drafted solo and still needs your review — it should have been filled in together.
 - Deck slide 1 still carries a team-name placeholder; slide 8's reference links need a check.
+- The deck's `maitri.jpg` / `bharati.jpg` are screenshots of the **old dark dashboard that no longer
+  exists** — they need replacing before the deck is shown.
+- **Phase 2 — what-if simulation:** *"generator 2 fails at −40 °C — how long does the habitat hold
+  above 18 °C?"* The physics for this already exists in `modelDemandKw`.
+- **Phase 3 — forecast / predictive maintenance:** projected diesel exhaustion against the resupply
+  window, driven off the same divergence-corrected burn rate.
+- Decide the 3D visual channel for divergence (see above).
 
 ## Blockers
 

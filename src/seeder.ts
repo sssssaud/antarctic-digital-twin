@@ -11,6 +11,10 @@
  *             and ends in full blizzard conditions.
  *   BHARATI - a supply-chain squeeze: low diesel, thin rations, resupply that
  *             arrives after the food runs out, degraded satellite uplink.
+ *
+ * Both stations also carry a hidden mechanical fault (see `FAULTS`) that never
+ * appears in the telemetry and never trips an alarm. Only the divergence engine
+ * can see it.
  */
 import { Station } from './models/station';
 import { Telemetry } from './models/telemetry';
@@ -25,6 +29,7 @@ import {
   round,
   seasonalTempC,
   windChillC,
+  type PlantState,
   type Reading,
   type StationCode,
 } from './telemetry-engine';
@@ -41,6 +46,23 @@ interface Scenario {
 const SCENARIOS: Record<StationCode, Scenario> = {
   MAITRI: { stress: 'none', storm: true },
   BHARATI: { stress: 'supply', storm: false },
+};
+
+/**
+ * Hidden plant degradation, and the reason this is a twin rather than a
+ * dashboard. None of it reaches a `Reading`, so no threshold rule can ever fire
+ * on it; the only route to the diagnosis is noticing that the station has
+ * stopped matching its own model.
+ *
+ * ponytail: each fault is constant across the window rather than ramping in.
+ * Ramp it once the dashboard plots divergence over time and a widening gap is
+ * worth showing; a flat offset is easier to read off a single number.
+ */
+const FAULTS: Record<StationCode, PlantState> = {
+  // Fouled heat exchangers: more kW to hold the same indoor temperature, worse burn.
+  MAITRI: { foulingPct: 0.24, leakLph: 0 },
+  // A leak downstream of the melt plant, far too slow to move the tank gauge.
+  BHARATI: { foulingPct: 0, leakLph: 16 },
 };
 
 function lerp(from: number, to: number, t: number): number {
@@ -130,7 +152,7 @@ export async function seedDatabase(now: Date = new Date()): Promise<SeedSummary>
     for (let index = 0; index < HISTORY_POINTS; index++) {
       const at = new Date(startMs + index * HISTORY_INTERVAL_MS);
       if (index > 0) {
-        reading = nextReading(reading, profile, at, Math.random, HISTORY_INTERVAL_H);
+        reading = nextReading(reading, profile, at, Math.random, HISTORY_INTERVAL_H, FAULTS[code]);
       }
       if (scenario.storm) {
         reading = applyStormFront(reading, index / (HISTORY_POINTS - 1), seasonalTempC(profile, at));
@@ -171,6 +193,7 @@ export async function tickSimulator(tickSeconds: number, now: Date = new Date())
         now,
         Math.random,
         tickSeconds / 3600,
+        FAULTS[code],
       );
 
       await Telemetry.create({ stationCode: code, recordedAt: now, ...reading });

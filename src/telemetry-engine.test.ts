@@ -5,10 +5,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  HEALTHY_PLANT,
   STATION_PROFILES,
   baselineReading,
   clamp,
   deriveStatus,
+  divergences,
   evaluateAlerts,
   nextReading,
   parseStationCode,
@@ -16,7 +18,9 @@ import {
   sparklinePoints,
   walk,
   windChillC,
+  type PlantState,
   type Reading,
+  type TimedReading,
 } from './telemetry-engine';
 
 /** Deterministic PRNG (mulberry32) so simulation tests are repeatable. */
@@ -170,4 +174,74 @@ test('sparklinePoints scales a series into the box', () => {
   assert.equal(sparklinePoints([], 100, 40), '');
   assert.equal(sparklinePoints([7], 100, 40), '0,20');
   assert.ok(sparklinePoints([4, 4, 4], 100, 40).split(' ').every((p) => p.endsWith(',20')));
+});
+
+// --- Divergence --------------------------------------------------------------
+// The engine must stay quiet on a healthy plant and speak up on a degraded one.
+// Anything less and the 3D twin would just be painting noise on the walls.
+
+/** Run a window of ticks through the simulator with a given hidden fault. */
+function windowWith(plant: PlantState, hours = 12, points = 72): TimedReading[] {
+  const rng = seeded(4242);
+  const step = hours / (points - 1);
+  const start = WINTER.getTime();
+  let reading = baselineReading(MAITRI, WINTER);
+  const out: TimedReading[] = [{ ...reading, recordedAt: new Date(start) }];
+  for (let i = 1; i < points; i += 1) {
+    const at = new Date(start + i * step * 3_600_000);
+    reading = nextReading(reading, MAITRI, at, rng, step, plant);
+    out.push({ ...reading, recordedAt: at });
+  }
+  return out;
+}
+
+test('divergences stays silent on a healthy plant', () => {
+  const found = divergences(windowWith(HEALTHY_PLANT), MAITRI);
+  assert.deepEqual(found, [], `healthy plant should not diverge, got ${JSON.stringify(found)}`);
+});
+
+test('divergences catches a water leak the threshold alarms would miss', () => {
+  const leaking = windowWith({ foulingPct: 0, leakLph: 30 });
+  const found = divergences(leaking, MAITRI);
+  const water = found.find((d) => d.metric === 'infrastructure.waterReserveL');
+  assert.ok(water, `expected a water divergence, got ${JSON.stringify(found)}`);
+  assert.ok(water.ratio > 0, 'reserve should be falling faster than modelled');
+
+  // The point of the whole exercise: the tank is still nowhere near an alarm.
+  const last = leaking[leaking.length - 1]!;
+  const alarms = evaluateAlerts(last).filter((a) => a.code.startsWith('WATER'));
+  assert.equal(alarms.length, 0, 'the leak must be invisible to the threshold rules');
+});
+
+test('divergences catches heat-exchanger fouling in demand and fuel burn', () => {
+  const found = divergences(windowWith({ foulingPct: 0.22, leakLph: 0 }), MAITRI);
+  const metrics = found.map((d) => d.metric);
+  assert.ok(metrics.includes('energy.demandKw'), `expected demand divergence, got ${metrics}`);
+  assert.ok(metrics.includes('energy.dieselLitres'), `expected fuel divergence, got ${metrics}`);
+  // 22% fouling sits between the 12% and 30% bands, so both read as a warning.
+  assert.ok(found.every((d) => d.severity === 'warning'), JSON.stringify(found));
+
+  // The percentage in the sentence and the ratio on the row are the same number,
+  // or the dashboard prints "+14%" beside "13% more fuel".
+  for (const d of found) {
+    const pct = Math.round(Math.abs(d.ratio) * 100);
+    assert.ok(d.message.includes(`${pct}%`), `${d.ratio} not phrased as ${pct}%: ${d.message}`);
+  }
+});
+
+test('divergences sorts the critical residual above the warning', () => {
+  // Fouling hits demand head-on but reaches fuel burn at 0.6 of its strength,
+  // so a bad enough plant makes demand critical while fuel is still a warning.
+  const found = divergences(windowWith({ foulingPct: 0.35, leakLph: 0 }), MAITRI);
+  assert.equal(found[0]?.metric, 'energy.demandKw');
+  assert.equal(found[0]?.severity, 'critical');
+  assert.equal(found[1]?.severity, 'warning');
+});
+
+test('divergences survives short, duplicated and backwards histories', () => {
+  const window = windowWith(HEALTHY_PLANT);
+  assert.deepEqual(divergences([], MAITRI), []);
+  assert.deepEqual(divergences(window.slice(0, 1), MAITRI), []);
+  const duped = [window[0]!, { ...window[1]!, recordedAt: window[0]!.recordedAt }];
+  assert.deepEqual(divergences(duped, MAITRI), [], 'a zero-length step must be skipped');
 });

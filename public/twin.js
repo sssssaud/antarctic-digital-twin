@@ -567,6 +567,22 @@ function applyState() {
   }
 }
 
+/**
+ * Which divergences the rail is currently showing. The card is server-rendered
+ * because its wording lives in one place for both pages, so the only honest
+ * thing the client can do when the set changes is ask for the page again.
+ * Ratios are left out on purpose: they drift every tick and would reload forever.
+ */
+function divergenceSignature(list) {
+  return list.map((d) => d.metric + ':' + d.severity).join('|');
+}
+
+let renderedDivergences = divergenceSignature(
+  Array.from(document.querySelectorAll('.dvg'), (el) => ({
+    metric: el.dataset.metric, severity: el.dataset.sev,
+  })),
+);
+
 async function poll() {
   try {
     const response = await fetch('/api/facility', { headers: { accept: 'application/json' } });
@@ -575,6 +591,7 @@ async function poll() {
     if (!body?.ok || !body.data) return;
     STATE = body.data;
     applyState();
+    if (divergenceSignature(STATE.divergences ?? []) !== renderedDivergences) window.location.reload();
   } catch {
     // A dropped poll is not fatal: the model keeps the last good state and the
     // next tick recovers. The station itself goes offline sometimes too.

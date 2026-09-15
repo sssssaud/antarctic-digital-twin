@@ -1,0 +1,22 @@
+<%
+/* One divergence list, included by both the console and the 3D twin, so the two
+   pages can never end up phrasing the same residual differently.
+   Locals: divergences, helpers, and optionally rooms (metric -> room names).
+   Litres are whole numbers; kW carries one decimal. */
+const fmtValue = function (value, unit) {
+  return helpers.num(value, unit === 'L' ? 0 : 1) + ' ' + unit;
+};
+%>
+<% divergences.forEach(function (d) { %>
+  <div class="dvg" data-sev="<%= d.severity %>" data-metric="<%= d.metric %>">
+    <div class="dvg-h">
+      <span class="dvg-l"><%= d.label %></span>
+      <span class="dvg-d"><%= d.ratio > 0 ? '+' : '-' %><%= Math.round(Math.abs(d.ratio) * 100) %>%</span>
+    </div>
+    <p class="dvg-n">model <%= fmtValue(d.expected, d.unit) %> &rarr; measured <%= fmtValue(d.actual, d.unit) %></p>
+    <p class="dvg-m"><%= d.message %></p>
+    <% if (typeof rooms !== 'undefined' && rooms[d.metric]) { %>
+      <p class="dvg-n">Look in: <%= rooms[d.metric] %></p>
+    <% } %>
+  </div>
+<% }); %>

@@ -14,6 +14,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ALERT_ZONES,
+  DIVERGENCE_ZONES,
   BAY_M,
   DATUM,
   LEVELS,
@@ -69,6 +70,15 @@ test('ALERT_ZONES never points at a zone that does not exist', () => {
     for (const id of ids) {
       if (id === STRUCTURE_ID) continue;
       assert.ok(zoneById(id), `alert ${code} points at unknown zone "${id}"`);
+    }
+  }
+});
+
+test('DIVERGENCE_ZONES sends every metric to real rooms', () => {
+  for (const [metric, ids] of Object.entries(DIVERGENCE_ZONES)) {
+    assert.ok(ids.length > 0, `divergence ${metric} points at no room`);
+    for (const id of ids) {
+      assert.ok(zoneById(id), `divergence ${metric} points at unknown zone "${id}"`);
     }
   }
 });

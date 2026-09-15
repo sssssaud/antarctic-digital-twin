@@ -73,7 +73,42 @@ immediately rather than needing to be waited for:
   *after* the food runs out, and a degraded satellite uplink.
 
 The dashboard polls the API every 5 s and patches the numbers in place; when the set of active
-alerts changes it reloads so the server-rendered banner stays the single source of truth.
+alerts or divergences changes it reloads so the server-rendered copy stays the single source of truth.
+
+---
+
+## Model divergence — the part a dashboard cannot do
+
+A threshold console tells you a number has left its safe band. By then the fault is hours or days
+old. A **twin** carries a model of what the station *should* be doing, and can therefore tell you
+that a number has stopped matching physics **while it is still comfortably inside its band**.
+
+Both stations are seeded with a hidden mechanical fault that never appears in any reading and can
+never trip an alarm:
+
+| Station | Hidden fault | What the gauges say | What the twin says |
+|---|---|---|---|
+| **Maitri** | Heat exchangers fouled 24 % | Power draw normal, tank falling as expected | **+22 % site demand, +14 % fuel burn** against what this weather and this crew should cost |
+| **Bharati** | 16 L/h seep downstream of the melt plant | Water reserve ~41 000 L — nowhere near the low-water threshold | **+18 % water leaving the loop** than the crew can account for |
+
+The engine replays a **12-hour window** of readings, re-derives each step from first principles —
+wind-chill-driven heat demand, litres of diesel per kWh, crew draw against melt-plant output — and
+reports the residual. Anything past 12 % reads as a warning, past 30 % as critical. Below that it
+stays silent, because a model that cries wolf is worse than no model.
+
+Two details that took measuring rather than guessing:
+
+- The window is **time-based, not row-based**. The live simulator ticks every few seconds, so the
+  newest 72 rows can span six minutes — and no leak worth catching moves measurable water in six
+  minutes.
+- Water is normalised against the **gross crew draw**, not the net tank change. Melt output very
+  nearly cancels crew consumption, so the net straddles zero and a ratio taken against it is an
+  artifact of that near-cancellation, not a measurement.
+
+The divergence panel is deliberately **not** styled as an alert, and divergences are deliberately
+kept out of station `status`. An alert says the station is in trouble now; a divergence says it is
+heading there while every gauge still reads normal. Folding one into the other would throw away the
+only signal the twin adds.
 
 ---
 
@@ -103,7 +138,7 @@ Severity is derived from the newest reading; a station's headline status is the 
 |---|---|---|
 | `GET` | `/api/health` | Service + database health |
 | `GET` | `/api/stations` | Both stations with latest reading, alerts, status |
-| `GET` | `/api/stations/:code` | One station snapshot (`MAITRI` / `BHARATI`) |
+| `GET` | `/api/stations/:code` | One station snapshot (`MAITRI` / `BHARATI`) — reading, alerts, status, divergences |
 | `GET` | `/api/stations/:code/telemetry?limit=n` | History, oldest-first (`limit` clamped to 500) |
 | `GET` | `/api/alerts` | Every active alert across both stations |
 
@@ -112,6 +147,7 @@ as JSON. Every handler is wrapped in `try/catch` and forwards to a central error
 
 ```bash
 curl localhost:3000/api/stations/MAITRI | jq '.data.alerts'
+curl localhost:3000/api/stations/MAITRI | jq '.data.divergences'   # what no alarm can see
 ```
 
 ---
@@ -256,6 +292,11 @@ python3 presentation/src/build.py
 
 - **The telemetry is simulated, not live.** There is no NCPOR feed behind this; it is a physics-shaped
   model seeded on boot. Every figure on the dashboard is generated locally.
+- **The divergence engine is checked against the same simulator that produces the readings.** That
+  proves the residual maths, not that these thresholds suit real NCPOR plant — real hardware would
+  need its bands calibrated against a season of logs.
+- Each hidden fault is a **constant offset** across the window rather than a fault that ramps in.
+  A widening gap is the more realistic signal and the more useful one to plot; it is not built yet.
 - **Data does not survive a restart** — that is the deliberate cost of a zero-setup in-memory database.
   Swapping to a persistent MongoDB is a one-line change in `src/db.ts`.
 - **`npm install` needs internet** to fetch the mongod binary (~176 MB, cached afterwards). The *run*

@@ -3,7 +3,7 @@
  * by the `view` local — one wrapper, any number of pages, no layout dependency.
  */
 import type { NextFunction, Request, Response } from 'express';
-import { facilityModel, zoneSeverities } from '../facility';
+import { DIVERGENCE_ZONES, facilityModel, zoneById, zoneSeverities } from '../facility';
 import { getAllSnapshots, getHistory } from '../station-service';
 import { parseStationCode, sparklinePoints } from '../telemetry-engine';
 
@@ -66,6 +66,13 @@ export async function twin(_req: Request, res: Response, next: NextFunction): Pr
       active,
       facility: facilityModel(),
       zones: zoneSeverities(active.alerts),
+      // A divergence names a quantity; the rail has to name a door to open.
+      divergenceRooms: Object.fromEntries(
+        active.divergences.map((d) => [
+          d.metric,
+          DIVERGENCE_ZONES[d.metric].map((id) => zoneById(id)?.name ?? id).join(', '),
+        ]),
+      ),
       generatedAt: new Date(),
     });
   } catch (error) {
